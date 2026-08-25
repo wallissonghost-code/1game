@@ -1,0 +1,51 @@
+name: Dynamic gift banner
+on:
+  push:
+    paths:
+      - '.github/workflows/dynamic-gift-banner.yml'
+permissions:
+  contents: write
+jobs:
+  patch:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Make gift cards follow panel rules
+        run: |
+          python3 - <<'PY'
+          from pathlib import Path
+          p=Path('game.html')
+          s=p.read_text()
+          css='''\n<style id="dynamic-gift-style">\n.rule.sync-empty{opacity:.48}.rule.sync-empty .giftimg{filter:grayscale(1);opacity:.45}.rule.sync-empty .action:after{content:" · SEM REGRA";font-size:.62em;color:#667085}.rule .gift-name{display:block;margin-top:1px;max-width:76px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;font-size:6px;font-weight:800;color:#758196}.rule.sync-live{box-shadow:inset 0 1px 0 #ffffff0b,0 0 0 1px #ffffff05}\n</style>\n'''
+          if 'id="dynamic-gift-style"' not in s:s=s.replace('</head>',css+'</head>',1)
+          marker="function hitCastle(team,d){"
+          helper="""const RULE_CARD_ACTIONS={red:['spawn_red_1','spawn_red_3','spawn_red_10','spawn_red_40'],blue:['spawn_blue_1','spawn_blue_3','spawn_blue_10','spawn_blue_40']};function applyRuleVisualSync(rules=[]){const byAction=new Map((Array.isArray(rules)?rules:[]).map(r=>[String(r.actionId||''),r]));for(const team of ['red','blue']){const cards=[...document.querySelectorAll('.side.'+team+' .rule')];RULE_CARD_ACTIONS[team].forEach((actionId,i)=>{const card=cards[i];if(!card)return;const rule=byAction.get(actionId),img=card.querySelector('.giftimg'),action=card.querySelector('.action');card.classList.toggle('sync-empty',!rule);card.classList.toggle('sync-live',!!rule);if(rule){if(img&&rule.giftIcon)img.src=rule.giftIcon;if(img)img.alt=rule.giftName||'Presente configurado';if(action){let n=action.querySelector('.gift-name');if(!n){n=document.createElement('small');n.className='gift-name';action.appendChild(n)}n.textContent=rule.trigger==='chat'?(rule.commentText||'Comentário'):(rule.giftName||'Presente')}}else if(action){const n=action.querySelector('.gift-name');if(n)n.remove()}})}}"""
+          if 'function applyRuleVisualSync' not in s:
+            if marker not in s: raise SystemExit('helper anchor miss')
+            s=s.replace(marker,helper+marker,1)
+          # Handle rules_sync before action command handling. The game uses d in its connection data handler.
+          candidates=["if(d.type==='command'){","if(d.type==='action'){","if(d.action){"]
+          inserted=False
+          for c in candidates:
+            if c in s:
+              s=s.replace(c,"if(d.type==='rules_sync'){applyRuleVisualSync(d.rules||[]);return}"+c,1);inserted=True;break
+          if not inserted and "d.type==='rules_sync'" not in s:
+            # fallback: inject immediately after generic object guard in conn data handler
+            c="if(!d||typeof d!=='object')return;"
+            if c in s:s=s.replace(c,c+"if(d.type==='rules_sync'){applyRuleVisualSync(d.rules||[]);return}",1);inserted=True
+          if not inserted and "d.type==='rules_sync'" not in s: raise SystemExit('data handler anchor miss')
+          p.write_text(s)
+          print('Dynamic gift banner applied')
+          PY
+      - name: Sanity checks
+        run: |
+          grep -q "applyRuleVisualSync" game.html
+          grep -q "rules_sync" game.html
+          grep -q "RULE_CARD_ACTIONS" game.html
+      - name: Commit
+        run: |
+          git config user.name ghostzinho
+          git config user.email wallissonghost@gmail.com
+          git add game.html
+          git commit -m "integration: sincronizar banners de presentes com o painel"
+          git push
