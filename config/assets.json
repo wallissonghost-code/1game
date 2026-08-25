@@ -1,0 +1,45 @@
+{
+  "version": 1,
+  "active": {
+    "map": "battlefield-default",
+    "castles": {
+      "red": "chaos-default",
+      "blue": "light-default"
+    },
+    "mobs": {
+      "warrior": {
+        "red": "warrior-chaos-default",
+        "blue": "warrior-light-default"
+      }
+    }
+  },
+  "maps": {
+    "battlefield-default": {
+      "type": "css",
+      "src": null
+    }
+  },
+  "castles": {
+    "chaos-default": {
+      "team": "red",
+      "src": null
+    },
+    "light-default": {
+      "team": "blue",
+      "src": null
+    }
+  },
+  "mobs": {
+    "warrior-chaos-default": {
+      "type": "warrior",
+      "team": "red",
+      "src": null
+    },
+    "warrior-light-default": {
+      "type": "warrior",
+      "team": "blue",
+      "src": null
+    }
+  },
+  "effects": {}
+}
