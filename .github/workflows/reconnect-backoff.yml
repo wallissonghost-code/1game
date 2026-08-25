@@ -1,0 +1,47 @@
+name: Reconnect backoff
+on:
+  push:
+    paths:
+      - '.github/workflows/reconnect-backoff.yml'
+permissions:
+  contents: write
+jobs:
+  patch:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Patch reconnect retry
+        run: |
+          python3 - <<'PY'
+          from pathlib import Path
+          import re
+          p=Path('game.html')
+          s=p.read_text()
+          original=s
+          patterns=[
+            (r"setTimeout\(\(\)=>connectPanel\(\),\s*(?:1000|1500|1800|2000|2200|2500)\)", "setTimeout(()=>connectPanel(),4500)"),
+            (r"setTimeout\(connectPanel,\s*(?:1000|1500|1800|2000|2200|2500)\)", "setTimeout(connectPanel,4500)"),
+            (r"setTimeout\(\(\)=>connect\(\),\s*(?:1000|1500|1800|2000|2200|2500)\)", "setTimeout(()=>connect(),4500)"),
+            (r"setTimeout\(connect,\s*(?:1000|1500|1800|2000|2200|2500)\)", "setTimeout(connect,4500)"),
+          ]
+          n=0
+          for pat,repl in patterns:
+            s,c=re.subn(pat,repl,s)
+            n+=c
+          # Generic retry delays near reconnect/retry function names.
+          s,c=re.subn(r"setTimeout\(([^)]*(?:reconnect|retry|tryConnect)[^)]*),\s*(?:1000|1500|1800|2000|2200|2500)\)", lambda m: f"setTimeout({m.group(1)},4500)", s, flags=re.I)
+          n+=c
+          if s==original:
+            print('No short reconnect timer pattern found; panel-side fix remains sufficient.')
+          else:
+            p.write_text(s)
+            print(f'Updated {n} reconnect timer(s) to 4500ms')
+          PY
+      - name: Commit
+        run: |
+          if git diff --quiet; then exit 0; fi
+          git config user.name ghostzinho
+          git config user.email wallissonghost@gmail.com
+          git add game.html
+          git commit -m "fix: reduzir loop de reconexao WebRTC"
+          git push
