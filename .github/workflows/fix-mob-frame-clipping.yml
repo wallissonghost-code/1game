@@ -1,0 +1,46 @@
+name: Fix Mob Frame Clipping
+on:
+  push:
+    paths:
+      - '.github/workflows/fix-mob-frame-clipping.yml'
+permissions:
+  contents: write
+jobs:
+  patch:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Fix sprite clipping and anchoring
+        run: |
+          python3 - <<'PY'
+          from pathlib import Path
+          p=Path('game.html')
+          s=p.read_text()
+          old='.unit{position:absolute;left:0;top:0;width:20px;height:28px;z-index:3;will-change:transform;contain:layout paint style}'
+          new='.unit{position:absolute;left:0;top:0;width:20px;height:28px;z-index:3;will-change:transform;contain:layout style;overflow:visible}'
+          if old not in s:
+              raise SystemExit('PATCH MISS: unit containment')
+          s=s.replace(old,new,1)
+          old2='.mob-sprite{position:absolute;left:-12px;top:-10px;width:44px;height:45px;object-fit:contain;pointer-events:none;transform-origin:50% 65%;filter:drop-shadow(0 4px 4px #0007);will-change:transform}'
+          new2='.mob-sprite{position:absolute;left:-12px;top:-17px;width:44px;height:52px;object-fit:contain;object-position:50% 100%;pointer-events:none;transform-origin:50% 100%;filter:drop-shadow(0 4px 4px #0007);will-change:transform}'
+          if old2 not in s:
+              raise SystemExit('PATCH MISS: sprite style')
+          s=s.replace(old2,new2,1)
+          # Keep mobile/landscape overrides tall enough for full sprites.
+          s=s.replace('.mob-sprite{width:48px;height:49px;left:-14px;top:-12px}', '.mob-sprite{width:48px;height:56px;left:-14px;top:-20px}',1)
+          s=s.replace('.mob-sprite{width:42px;height:43px}', '.mob-sprite{width:42px;height:50px;top:-16px}',1)
+          p.write_text(s)
+          print('Mob clipping fix applied')
+          PY
+      - name: Sanity checks
+        run: |
+          grep -q 'contain:layout style;overflow:visible' game.html
+          grep -q 'object-position:50% 100%' game.html
+          grep -q 'transform-origin:50% 100%' game.html
+      - name: Commit
+        run: |
+          git config user.name ghostzinho
+          git config user.email wallissonghost@gmail.com
+          git add game.html
+          git commit -m "fix: remover recorte dos frames e ancorar sprites pelos pes"
+          git push
