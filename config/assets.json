@@ -1,10 +1,10 @@
 {
-  "version": 1,
+  "version": 2,
   "active": {
     "map": "battlefield-default",
     "castles": {
-      "red": "chaos-default",
-      "blue": "light-default"
+      "red": "chaos-red-v1",
+      "blue": "light-blue-v1"
     },
     "mobs": {
       "warrior": {
@@ -20,13 +20,19 @@
     }
   },
   "castles": {
-    "chaos-default": {
+    "chaos-red-v1": {
       "team": "red",
-      "src": null
+      "type": "image",
+      "src": "assets/castles/Vermelho.png",
+      "anchor": "left-center",
+      "attackRadius": 34
     },
-    "light-default": {
+    "light-blue-v1": {
       "team": "blue",
-      "src": null
+      "type": "image",
+      "src": "assets/castles/Azul.png",
+      "anchor": "right-center",
+      "attackRadius": 34
     }
   },
   "mobs": {
