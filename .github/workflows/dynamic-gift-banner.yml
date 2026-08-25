@@ -23,17 +23,12 @@ jobs:
           if 'function applyRuleVisualSync' not in s:
             if marker not in s: raise SystemExit('helper anchor miss')
             s=s.replace(marker,helper+marker,1)
-          # Handle rules_sync before action command handling. The game uses d in its connection data handler.
-          candidates=["if(d.type==='command'){","if(d.type==='action'){","if(d.action){"]
-          inserted=False
-          for c in candidates:
-            if c in s:
-              s=s.replace(c,"if(d.type==='rules_sync'){applyRuleVisualSync(d.rules||[]);return}"+c,1);inserted=True;break
-          if not inserted and "d.type==='rules_sync'" not in s:
-            # fallback: inject immediately after generic object guard in conn data handler
-            c="if(!d||typeof d!=='object')return;"
-            if c in s:s=s.replace(c,c+"if(d.type==='rules_sync'){applyRuleVisualSync(d.rules||[]);return}",1);inserted=True
-          if not inserted and "d.type==='rules_sync'" not in s: raise SystemExit('data handler anchor miss')
+          old="else command(d)"
+          new="else if(d?.type==='rules_sync'){applyRuleVisualSync(d.rules||[])}else command(d)"
+          if old in s:
+            s=s.replace(old,new,1)
+          elif "d?.type==='rules_sync'" not in s:
+            raise SystemExit('data handler anchor miss')
           p.write_text(s)
           print('Dynamic gift banner applied')
           PY
