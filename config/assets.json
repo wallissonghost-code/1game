@@ -1,7 +1,7 @@
 {
-  "version": 2,
+  "version": 3,
   "active": {
-    "map": "battlefield-default",
+    "map": "battlefield-v1",
     "castles": {
       "red": "chaos-red-v1",
       "blue": "light-blue-v1"
@@ -17,6 +17,12 @@
     "battlefield-default": {
       "type": "css",
       "src": null
+    },
+    "battlefield-v1": {
+      "type": "image",
+      "src": "assets/maps/1E8747E0-589E-4209-8DFB-1444FE1A84CA.png",
+      "fit": "cover",
+      "position": "center"
     }
   },
   "castles": {
