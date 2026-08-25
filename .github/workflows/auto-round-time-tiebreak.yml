@@ -1,0 +1,70 @@
+name: Auto Round Time Tiebreak
+on:
+  push:
+    paths:
+      - '.github/workflows/auto-round-time-tiebreak.yml'
+permissions:
+  contents: write
+jobs:
+  patch:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Add timed finish, HP tiebreak and auto next round
+        run: |
+          python3 - <<'PY'
+          from pathlib import Path
+          p=Path('game.html')
+          s=p.read_text()
+
+          css='''\n<style id="round-result-v2-style">\n.victory-overlay{background:radial-gradient(circle at 50% 42%,rgba(18,27,43,.52),rgba(2,5,10,.82));backdrop-filter:blur(7px) saturate(.8)}\n.victory-card{position:relative;overflow:hidden;width:min(91%,350px);padding:20px 18px 17px;border-radius:24px;background:linear-gradient(155deg,rgba(18,27,43,.985),rgba(5,9,16,.99));box-shadow:0 28px 80px #000d,inset 0 1px 0 #ffffff18}\n.victory-card:before{content:"";position:absolute;left:12%;right:12%;top:0;height:1px;background:linear-gradient(90deg,transparent,#ffe08aaa,transparent)}\n.victory-crown{font-size:36px;margin-bottom:6px}.victory-kicker{font-size:7px;color:#a6b2c4}.victory-title{font-size:21px;line-height:1.08;margin:5px auto 0;max-width:285px}.result-reason{margin-top:7px;font-size:7px;font-weight:900;letter-spacing:.15em;color:#7f8b9d}.result-health{display:grid;grid-template-columns:1fr 1fr;gap:7px;margin-top:13px}.result-team{padding:9px 8px;border-radius:13px;background:#070d16cc;border:1px solid #ffffff12;text-align:left}.result-team.red{border-color:#ff5b6828}.result-team.blue{border-color:#5797ff2c}.result-team span{display:block;font-size:7px;font-weight:950;letter-spacing:.08em;color:#a5afbd}.result-team b{display:block;margin-top:3px;font-size:16px}.result-hpbar{height:4px;margin-top:6px;border-radius:8px;background:#151c27;overflow:hidden}.result-hpbar i{display:block;height:100%;border-radius:8px}.result-team.red .result-hpbar i{background:#ff5361}.result-team.blue .result-hpbar i{background:#4b8cff}.victory-star{margin-top:11px}.next-round{margin-top:10px;padding-top:9px;border-top:1px solid #ffffff10;font-size:7px;font-weight:850;letter-spacing:.08em;color:#8490a1}.next-round b{color:#fff;font-size:10px}.victory-overlay.draw .victory-card{border-color:#d4b86b50;box-shadow:0 28px 80px #000d,0 0 38px #d8bd5a18}.victory-overlay.draw .victory-star{display:none}@media(max-width:390px){.victory-card{width:min(92%,320px);padding:17px 14px 15px}.victory-title{font-size:18px}.result-team b{font-size:14px}}\n</style>\n'''
+          if 'id="round-result-v2-style"' not in s:
+              s=s.replace('</head>',css+'</head>',1)
+
+          old_overlay='''<div class="victory-overlay" id="victoryOverlay"><div class="victory-card"><div class="victory-crown">👑</div><div class="victory-kicker">FIM DA BATALHA</div><div class="victory-title" id="victoryTitle">VITÓRIA</div><div class="victory-star">⭐ +1 ESTRELA</div><div class="victory-sub" id="victorySub">Prepare-se para a próxima rodada</div></div></div>'''
+          new_overlay='''<div class="victory-overlay" id="victoryOverlay"><div class="victory-card"><div class="victory-crown" id="victoryCrown">👑</div><div class="victory-kicker">RESULTADO DA RODADA</div><div class="victory-title" id="victoryTitle">VITÓRIA</div><div class="result-reason" id="victoryReason">CASTELO DESTRUÍDO</div><div class="result-health"><div class="result-team red"><span>🔴 CAOS · VIDA FINAL</span><b id="resultRedHp">100%</b><div class="result-hpbar"><i id="resultRedBar"></i></div></div><div class="result-team blue"><span>🔵 LUZ · VIDA FINAL</span><b id="resultBlueHp">100%</b><div class="result-hpbar"><i id="resultBlueBar"></i></div></div></div><div class="victory-star">⭐ +1 ESTRELA</div><div class="victory-sub" id="victorySub">Placar</div><div class="next-round">PRÓXIMA BATALHA EM <b id="nextRoundCount">5</b>S</div></div></div>'''
+          if old_overlay in s:
+              s=s.replace(old_overlay,new_overlay,1)
+          elif 'id="nextRoundCount"' not in s:
+              raise SystemExit('overlay v1 not found')
+
+          old_helpers="""function updateStars(){const r=$('redStars'),b=$('blueStars');if(r)r.textContent=redStars+' ⭐';if(b)b.textContent=blueStars+' ⭐'}function saveStars(){try{sessionStorage.setItem('1game-red-stars',String(redStars));sessionStorage.setItem('1game-blue-stars',String(blueStars))}catch{}}function showVictory(winner){if(ended)return;ended=true;if(winner==='red')redStars++;else blueStars++;saveStars();updateStars();const o=$('victoryOverlay');if(o){o.className='victory-overlay show '+winner;$('victoryTitle').textContent=winner==='red'?'🔴 REINO DO CAOS VENCEU':'🔵 REINO DA LUZ VENCEU';$('victorySub').textContent='Placar: 🔴 '+redStars+' ⭐  ·  🔵 '+blueStars+' ⭐'}document.querySelector('.clash').textContent=winner==='red'?'🔴 VITÓRIA DO CAOS':'🔵 VITÓRIA DA LUZ';sendState(true)}function hideVictory(){const o=$('victoryOverlay');if(o)o.className='victory-overlay'}function resetMatch(){redStars=0;blueStars=0;saveStars();updateStars();reset()}"""
+          new_helpers="""let roundResetTimer=null,roundCountdownTimer=null;function updateStars(){const r=$('redStars'),b=$('blueStars');if(r)r.textContent=redStars+' ⭐';if(b)b.textContent=blueStars+' ⭐'}function saveStars(){try{sessionStorage.setItem('1game-red-stars',String(redStars));sessionStorage.setItem('1game-blue-stars',String(blueStars))}catch{}}function fillResultHealth(){const rh=Math.max(0,Math.round(redHp)),bh=Math.max(0,Math.round(blueHp));const rt=$('resultRedHp'),bt=$('resultBlueHp'),rb=$('resultRedBar'),bb=$('resultBlueBar');if(rt)rt.textContent=rh+'%';if(bt)bt.textContent=bh+'%';if(rb)rb.style.width=rh+'%';if(bb)bb.style.width=bh+'%'}function scheduleNextRound(){clearTimeout(roundResetTimer);clearInterval(roundCountdownTimer);let left=5;const c=$('nextRoundCount');if(c)c.textContent=left;roundCountdownTimer=setInterval(()=>{left--;if(c)c.textContent=Math.max(0,left);if(left<=0)clearInterval(roundCountdownTimer)},1000);roundResetTimer=setTimeout(()=>reset(),5000)}function showVictory(winner,reason='CASTELO DESTRUÍDO'){if(ended)return;ended=true;if(winner==='red')redStars++;else if(winner==='blue')blueStars++;saveStars();updateStars();fillResultHealth();const o=$('victoryOverlay'),title=$('victoryTitle'),why=$('victoryReason'),crown=$('victoryCrown');if(o){o.className='victory-overlay show '+(winner||'draw');if(title)title.textContent=winner==='red'?'🔴 REINO DO CAOS VENCEU':winner==='blue'?'🔵 REINO DA LUZ VENCEU':'⚔️ EMPATE';if(why)why.textContent=reason;if(crown)crown.textContent=winner?'👑':'🤝';$('victorySub').textContent=winner?'Placar: 🔴 '+redStars+' ⭐  ·  🔵 '+blueStars+' ⭐':'Nenhuma estrela nesta rodada'}document.querySelector('.clash').textContent=winner==='red'?'🔴 VITÓRIA DO CAOS':winner==='blue'?'🔵 VITÓRIA DA LUZ':'⚔️ EMPATE';sendState(true);scheduleNextRound()}function finishByTime(){if(ended)return;if(redHp>blueHp)showVictory('red','TEMPO ESGOTADO · MAIOR VIDA DO CASTELO');else if(blueHp>redHp)showVictory('blue','TEMPO ESGOTADO · MAIOR VIDA DO CASTELO');else showVictory(null,'TEMPO ESGOTADO · CASTELOS EMPATADOS')}function hideVictory(){clearTimeout(roundResetTimer);clearInterval(roundCountdownTimer);roundResetTimer=null;roundCountdownTimer=null;const o=$('victoryOverlay');if(o)o.className='victory-overlay'}function resetMatch(){redStars=0;blueStars=0;saveStars();updateStars();reset()}"""
+          if old_helpers in s:
+              s=s.replace(old_helpers,new_helpers,1)
+          elif 'function finishByTime()' not in s:
+              raise SystemExit('victory helper block not found')
+
+          s=s.replace("showVictory(redHp<=0?'blue':'red');return", "showVictory(redHp<=0?'blue':'red','CASTELO INIMIGO DESTRUÍDO');return",1)
+
+          old_reset="redHp=blueHp=100;redDeaths=blueDeaths=0;spawnSeq={red:0,blue:0};ended=false;hideVictory();"
+          new_reset="redHp=blueHp=100;redDeaths=blueDeaths=0;spawnSeq={red:0,blue:0};time=90;ended=false;hideVictory();"
+          if old_reset in s:
+              s=s.replace(old_reset,new_reset,1)
+          elif 'time=90;ended=false;hideVictory();' not in s:
+              raise SystemExit('reset timer anchor not found')
+
+          old_timer="setInterval(()=>{time=Math.max(0,time-1);$('timer').textContent=String(Math.floor(time/60)).padStart(2,'0')+':'+String(time%60).padStart(2,'0')},1000)"
+          new_timer="setInterval(()=>{if(!ended&&time>0){time=Math.max(0,time-1);if(time===0)finishByTime()}$('timer').textContent=String(Math.floor(time/60)).padStart(2,'0')+':'+String(time%60).padStart(2,'0')},1000)"
+          if old_timer in s:
+              s=s.replace(old_timer,new_timer,1)
+          elif 'if(time===0)finishByTime()' not in s:
+              raise SystemExit('timer interval not found')
+
+          p.write_text(s)
+          print('Auto round + HP tiebreak + result V2 applied')
+          PY
+      - name: Sanity checks
+        run: |
+          grep -q 'function finishByTime' game.html
+          grep -q 'scheduleNextRound' game.html
+          grep -q 'resultRedHp' game.html
+          grep -q 'nextRoundCount' game.html
+          grep -q "time=90;ended=false" game.html
+      - name: Commit
+        run: |
+          git config user.name ghostzinho
+          git config user.email wallissonghost@gmail.com
+          git add game.html
+          git commit -m "gameplay: auto reset, desempate por vida e resultado premium"
+          git push
