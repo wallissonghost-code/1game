@@ -2,39 +2,85 @@
 <html lang="pt-BR">
 <head>
   <meta charset="UTF-8" />
-  <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no, viewport-fit=cover" />
+  <meta name="viewport" content="width=device-width,initial-scale=1,maximum-scale=1,user-scalable=no,viewport-fit=cover" />
   <meta name="theme-color" content="#0b0e16" />
+  <meta name="apple-mobile-web-app-capable" content="yes" />
   <title>1Game</title>
   <style>
     *{box-sizing:border-box;-webkit-tap-highlight-color:transparent}
-    html,body{margin:0;width:100%;height:100%;overflow:hidden;overscroll-behavior:none;background:#080a10;touch-action:manipulation;font-family:Inter,system-ui,-apple-system,sans-serif;color:#fff}
-    body{position:fixed;inset:0;user-select:none;-webkit-user-select:none}
-    .game{position:absolute;inset:0;width:100%;height:100%;overflow:hidden;background:radial-gradient(circle at 50% 38%,#26344c 0,#131925 35%,#090c13 72%);display:flex;flex-direction:column;align-items:center;justify-content:space-between;padding:max(28px,env(safe-area-inset-top)) 20px max(30px,env(safe-area-inset-bottom))}
-    .game:before{content:"";position:absolute;left:-25%;right:-25%;bottom:-10%;height:46%;background:radial-gradient(ellipse at center,#263147 0,#111722 48%,transparent 70%);transform:perspective(500px) rotateX(62deg);opacity:.9}
-    .top{z-index:2;text-align:center}.brand{font-weight:900;letter-spacing:.16em;font-size:clamp(24px,8vw,38px);text-shadow:0 4px 20px #000}.sub{font-size:12px;letter-spacing:.28em;color:#9da8bb;margin-top:5px}
-    .stage{z-index:2;flex:1;width:100%;display:flex;align-items:center;justify-content:center;min-height:0}
-    .shadow{position:absolute;width:130px;height:28px;border-radius:50%;background:#000;filter:blur(9px);opacity:.5;transform:translateY(132px)}
-    .char{position:relative;width:120px;height:245px;animation:idle 2.4s ease-in-out infinite;filter:drop-shadow(0 10px 16px #0008)}
-    .head{position:absolute;top:0;left:35px;width:52px;height:59px;border-radius:45% 45% 48% 48%;background:linear-gradient(135deg,#d9ad8b,#9d684f);border:3px solid #151922}.hair{position:absolute;top:-2px;left:34px;width:54px;height:25px;border-radius:28px 28px 8px 8px;background:#17191f}.body{position:absolute;top:57px;left:26px;width:70px;height:92px;border-radius:18px 18px 13px 13px;background:linear-gradient(135deg,#2d3546,#151b28);border:3px solid #0d111a}.arm{position:absolute;top:67px;width:25px;height:91px;border-radius:14px;background:#252d3c;border:3px solid #0d111a;transform-origin:top}.arm.l{left:10px;transform:rotate(7deg)}.arm.r{right:8px;transform:rotate(-7deg)}.leg{position:absolute;top:140px;width:31px;height:98px;border-radius:10px 10px 15px 15px;background:#171d29;border:3px solid #0d111a}.leg.l{left:28px}.leg.r{right:24px}.shoe{position:absolute;bottom:-4px;width:39px;height:20px;border-radius:8px 13px 7px 7px;background:#080a0e}.leg.l .shoe{right:0}.leg.r .shoe{left:0}
-    .actions{z-index:3;width:min(100%,420px);display:grid;gap:12px}.btn{width:100%;min-height:58px;border:1px solid #ffffff24;border-radius:17px;font-size:17px;font-weight:800;letter-spacing:.04em;color:white;background:#202839;box-shadow:0 10px 25px #0006;touch-action:manipulation}.play{background:linear-gradient(180deg,#f5f7fb,#cbd3df);color:#10141d;border-color:white;box-shadow:0 10px 30px #dbe6ff24}.btn:active{transform:scale(.98)}
-    .hint{text-align:center;font-size:11px;color:#687387;margin-top:2px}
+    html,body{margin:0;width:100%;height:100%;overflow:hidden;overscroll-behavior:none;background:#080a10;font-family:Inter,system-ui,-apple-system,sans-serif;color:#fff}
+    body{position:fixed;inset:0;user-select:none;-webkit-user-select:none;touch-action:manipulation}
+    button,input{font:inherit}
+    .game{position:absolute;inset:0;width:100%;height:100%;overflow:hidden;background:radial-gradient(circle at 50% 35%,#26344c 0,#131925 34%,#090c13 72%);display:flex;flex-direction:column;align-items:center;padding:max(24px,env(safe-area-inset-top)) 18px max(24px,env(safe-area-inset-bottom))}
+    .game:before{content:"";position:absolute;left:-25%;right:-25%;bottom:-9%;height:43%;background:radial-gradient(ellipse at center,#263147 0,#111722 48%,transparent 70%);transform:perspective(500px) rotateX(62deg);opacity:.9;pointer-events:none}
+    .top{z-index:2;text-align:center;flex:0 0 auto}.brand{font-weight:950;letter-spacing:.16em;font-size:clamp(23px,7vw,36px);text-shadow:0 4px 20px #000}.sub{font-size:10px;letter-spacing:.28em;color:#9da8bb;margin-top:4px}
+    .connection-state{margin-top:9px;display:inline-flex;align-items:center;gap:6px;padding:6px 10px;border:1px solid #ffffff18;border-radius:999px;background:#090d16aa;font-size:9px;font-weight:900;letter-spacing:.08em;color:#8d98aa}.dot{width:7px;height:7px;border-radius:50%;background:#596272}.connection-state.online{color:#9ef0bd;border-color:#4ade8036}.connection-state.online .dot{background:#4ade80;box-shadow:0 0 10px #4ade80}
+    .stage{z-index:2;flex:1;width:100%;display:flex;align-items:center;justify-content:center;min-height:130px;position:relative}
+    .shadow{position:absolute;width:124px;height:27px;border-radius:50%;background:#000;filter:blur(9px);opacity:.5;transform:translateY(125px)}
+    .char{position:relative;width:114px;height:232px;animation:idle 2.4s ease-in-out infinite;filter:drop-shadow(0 10px 16px #0008)}
+    .head{position:absolute;top:0;left:33px;width:50px;height:56px;border-radius:45% 45% 48% 48%;background:linear-gradient(135deg,#d9ad8b,#9d684f);border:3px solid #151922}.hair{position:absolute;top:-2px;left:32px;width:52px;height:24px;border-radius:28px 28px 8px 8px;background:#17191f}.body{position:absolute;top:54px;left:25px;width:67px;height:88px;border-radius:18px 18px 13px 13px;background:linear-gradient(135deg,#2d3546,#151b28);border:3px solid #0d111a}.arm{position:absolute;top:64px;width:24px;height:87px;border-radius:14px;background:#252d3c;border:3px solid #0d111a;transform-origin:top}.arm.l{left:9px;transform:rotate(7deg)}.arm.r{right:7px;transform:rotate(-7deg)}.leg{position:absolute;top:134px;width:30px;height:94px;border-radius:10px 10px 15px 15px;background:#171d29;border:3px solid #0d111a}.leg.l{left:26px}.leg.r{right:23px}.shoe{position:absolute;bottom:-4px;width:37px;height:19px;border-radius:8px 13px 7px 7px;background:#080a0e}.leg.l .shoe{right:0}.leg.r .shoe{left:0}
+    .actions{z-index:3;flex:0 0 auto;width:min(100%,420px);display:grid;gap:10px}.pair-box{padding:12px;border:1px solid #ffffff16;border-radius:18px;background:#0b101bcf;box-shadow:0 14px 30px #0005;backdrop-filter:blur(12px)}.pair-label{display:flex;justify-content:space-between;align-items:center;gap:10px;margin-bottom:8px;font-size:9px;font-weight:950;letter-spacing:.12em;color:#8793a7}.pair-label b{font-size:9px;color:#677388}.pair-row{display:grid;grid-template-columns:1fr auto;gap:8px}.pair-input{width:100%;min-width:0;height:50px;border:1px solid #37445b;border-radius:13px;background:#080c14;color:#fff;text-align:center;text-transform:uppercase;font-size:18px;font-weight:950;letter-spacing:.16em;outline:none;user-select:text;-webkit-user-select:text}.pair-input:focus{border-color:#8ea6c9}.connect-btn{height:50px;padding:0 15px;border:0;border-radius:13px;background:#dce4ef;color:#101620;font-size:12px;font-weight:950}.pair-msg{min-height:16px;margin-top:7px;text-align:center;font-size:9px;font-weight:800;color:#718096}.pair-msg.ok{color:#75dfa0}.pair-msg.err{color:#ff9d9d}
+    .btn{width:100%;min-height:54px;border:1px solid #ffffff24;border-radius:16px;font-size:16px;font-weight:900;letter-spacing:.04em;color:white;background:#202839;box-shadow:0 10px 25px #0005;touch-action:manipulation}.play{background:linear-gradient(180deg,#f5f7fb,#cbd3df);color:#10141d;border-color:white}.btn:active,.connect-btn:active{transform:scale(.98)}.hint{text-align:center;font-size:9px;color:#687387}
+    .event-toast{position:absolute;z-index:20;left:50%;top:max(82px,calc(env(safe-area-inset-top) + 64px));transform:translate(-50%,-12px);width:min(86%,350px);padding:12px 14px;border:1px solid #ffffff22;border-radius:15px;background:#111827ec;text-align:center;font-size:12px;font-weight:900;opacity:0;pointer-events:none;transition:.22s}.event-toast.show{opacity:1;transform:translate(-50%,0)}
     @keyframes idle{0%,100%{transform:translateY(2px)}50%{transform:translateY(-5px)}}
-    @media(prefers-reduced-motion:reduce){.char{animation:none}}
+    @media(max-height:650px){.char{transform:scale(.82);animation:none}.stage{min-height:110px}.pair-box{padding:9px}.btn{min-height:48px}}
+    @media(prefers-reduced-motion:reduce){.char{animation:none}.event-toast{transition:none}}
   </style>
 </head>
 <body>
   <main class="game" id="game">
-    <header class="top"><div class="brand">1GAME</div><div class="sub">LIVE INTERACTIVE</div></header>
-    <section class="stage" aria-label="Personagem"><div class="shadow"></div><div class="char" aria-hidden="true"><div class="head"></div><div class="hair"></div><div class="body"></div><div class="arm l"></div><div class="arm r"></div><div class="leg l"><i class="shoe"></i></div><div class="leg r"><i class="shoe"></i></div></div></section>
-    <nav class="actions"><button class="btn play" id="play" type="button">▶ JOGAR</button><button class="btn" id="achievements" type="button">🏆 CONQUISTAS</button><div class="hint">Protótipo do lobby</div></nav>
+    <header class="top">
+      <div class="brand">1GAME</div><div class="sub">LIVE INTERACTIVE</div>
+      <div class="connection-state" id="connectionState"><i class="dot"></i><span>PAINEL DESCONECTADO</span></div>
+    </header>
+    <div class="event-toast" id="eventToast" aria-live="polite"></div>
+    <section class="stage" aria-label="Personagem">
+      <div class="shadow"></div><div class="char" id="character" aria-hidden="true"><div class="head"></div><div class="hair"></div><div class="body"></div><div class="arm l"></div><div class="arm r"></div><div class="leg l"><i class="shoe"></i></div><div class="leg r"><i class="shoe"></i></div></div>
+    </section>
+    <nav class="actions">
+      <section class="pair-box" aria-label="Conectar ao painel">
+        <div class="pair-label"><span>ID DO PAINEL</span><b>PAINEL → JOGO</b></div>
+        <div class="pair-row"><input id="panelCode" class="pair-input" maxlength="9" inputmode="text" autocomplete="off" autocapitalize="characters" spellcheck="false" placeholder="XXXX-XXXX" aria-label="ID fornecido pelo painel"><button id="connectPanel" class="connect-btn" type="button">CONECTAR</button></div>
+        <div class="pair-msg" id="pairMessage">Gere o ID no painel e digite aqui.</div>
+      </section>
+      <button class="btn play" id="play" type="button">▶ JOGAR</button>
+      <button class="btn" id="achievements" type="button">🏆 CONQUISTAS</button>
+      <div class="hint">O jogo apenas recebe o ID. O painel é quem cria a sessão.</div>
+    </nav>
   </main>
+  <script src="https://unpkg.com/peerjs@1.5.4/dist/peerjs.min.js"></script>
   <script>
-    const stopZoom=e=>{if(e.touches&&e.touches.length>1)e.preventDefault()};
-    document.addEventListener('touchmove',stopZoom,{passive:false});
-    document.addEventListener('gesturestart',e=>e.preventDefault(),{passive:false});
-    let last=0;document.addEventListener('touchend',e=>{const now=Date.now();if(now-last<=300)e.preventDefault();last=now},{passive:false});
-    document.getElementById('play').addEventListener('click',()=>alert('Jogo será conectado aqui.'));
-    document.getElementById('achievements').addEventListener('click',()=>alert('Conquistas serão exibidas aqui.'));
+    (()=>{'use strict';
+      const $=id=>document.getElementById(id), input=$('panelCode'), msg=$('pairMessage'), state=$('connectionState'), toast=$('eventToast');
+      let peer=null,conn=null,code='',retryTimer=null,retry=0,manual=false,toastTimer=null;
+      const clean=v=>String(v||'').toUpperCase().replace(/[^A-Z0-9]/g,'').slice(0,8);
+      const format=v=>{v=clean(v);return v.length>4?v.slice(0,4)+'-'+v.slice(4):v};
+      const target=v=>'1game-session-'+clean(v).toLowerCase();
+      const setMsg=(text,tone='')=>{msg.textContent=text;msg.className='pair-msg '+tone};
+      const setState=(text,on=false)=>{state.querySelector('span').textContent=text;state.classList.toggle('online',on)};
+      const cleanup=()=>{clearTimeout(retryTimer);retryTimer=null;try{conn?.close()}catch{}try{peer?.destroy()}catch{}conn=null;peer=null};
+      const showEvent=text=>{clearTimeout(toastTimer);toast.textContent=text;toast.classList.add('show');toastTimer=setTimeout(()=>toast.classList.remove('show'),1800)};
+      function scheduleReconnect(){if(manual||!code||retryTimer)return;retry++;if(retry>5){setState('PAINEL DESCONECTADO');setMsg('Conexão perdida. Toque em CONECTAR novamente.','err');return}const delay=Math.min(4500,600*Math.pow(1.6,retry));setState('RECONECTANDO...');retryTimer=setTimeout(()=>{retryTimer=null;open(true)},delay)}
+      function onData(data){if(!data||typeof data!=='object')return;if(data.type==='session_accept'){retry=0;setState('PAINEL CONECTADO',true);setMsg('Conectado ao painel · '+format(code),'ok');try{conn.send({type:'game_manifest',protocol:'1game-manifest-v1',manifest:{name:'1Game',version:'0.1',orientation:'portrait',actions:['like','comment','gift']}})}catch{}return}if(data.type==='session_reject'){manual=true;setState('CONEXÃO RECUSADA');setMsg(data.reason||'Sessão recusada pelo painel.','err');cleanup();return}if(data.type==='live_event'){const labels={like:'❤️ Curtida recebida',comment:'💬 Comentário recebido',gift:'🎁 Presente recebido'};showEvent(labels[data.event]||'⚡ Evento recebido');document.body.dataset.lastLiveEvent=String(data.event||'');return}if(data.type==='command')showEvent('⚡ Comando do painel: '+String(data.command||'evento'))}
+      function open(isRetry=false){
+        if(typeof Peer==='undefined'){setMsg('PeerJS não carregou. Verifique a internet.','err');return}
+        cleanup();manual=false;setState(isRetry?'RECONECTANDO...':'CONECTANDO...');setMsg('Procurando a sessão do painel...');
+        peer=new Peer(undefined,{debug:0});
+        peer.on('open',()=>{conn=peer.connect(target(code),{reliable:true,serialization:'json'});conn.on('open',()=>{try{conn.send({type:'session_hello',protocol:'1game-live-v1'})}catch{}setMsg('Canal encontrado. Autorizando...')});conn.on('data',onData);conn.on('close',()=>{setState('PAINEL DESCONECTADO');setMsg('Canal caiu. Tentando reconectar...');scheduleReconnect()});conn.on('error',()=>scheduleReconnect())});
+        peer.on('error',e=>{if(e?.type==='peer-unavailable'){setState('ID NÃO ENCONTRADO');setMsg('Esse ID não está ativo no painel.','err');manual=true;cleanup()}else scheduleReconnect()});
+        peer.on('disconnected',()=>{try{peer.reconnect()}catch{scheduleReconnect()}});
+      }
+      function connect(){const c=clean(input.value);input.value=format(c);if(c.length!==8){setMsg('Digite os 8 caracteres fornecidos pelo painel.','err');return}code=c;retry=0;manual=false;try{sessionStorage.setItem('1game-panel-code',format(code))}catch{}open(false)}
+      input.addEventListener('input',()=>{const pos=input.selectionStart;input.value=format(input.value)});
+      input.addEventListener('keydown',e=>{if(e.key==='Enter')connect()});
+      $('connectPanel').addEventListener('click',connect);
+      try{const saved=sessionStorage.getItem('1game-panel-code');if(saved)input.value=saved}catch{}
+      $('play').addEventListener('click',()=>showEvent(conn?.open?'▶ Jogo conectado e pronto.':'▶ Você pode jogar sem painel.'));
+      $('achievements').addEventListener('click',()=>showEvent('🏆 Conquistas serão adicionadas aqui.'));
+      const stopZoom=e=>{if(e.touches&&e.touches.length>1)e.preventDefault()};
+      document.addEventListener('touchmove',stopZoom,{passive:false});document.addEventListener('gesturestart',e=>e.preventDefault(),{passive:false});
+      let last=0;document.addEventListener('touchend',e=>{const now=Date.now();if(now-last<=300&&!e.target.closest('input'))e.preventDefault();last=now},{passive:false});
+    })();
   </script>
 </body>
 </html>
