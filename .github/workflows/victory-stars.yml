@@ -1,0 +1,106 @@
+name: Victory Stars
+on:
+  push:
+    paths:
+      - '.github/workflows/victory-stars.yml'
+permissions:
+  contents: write
+jobs:
+  patch:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Add victory overlay and stars
+        run: |
+          python3 - <<'PY'
+          from pathlib import Path
+          p=Path('game.html')
+          s=p.read_text()
+
+          css='''\n<style id="victory-stars-style">\n.star-score{margin-top:2px;font-size:8px;font-weight:950;letter-spacing:.04em;color:#ffd66b;text-shadow:0 1px 6px #000}.realm.blue .star-score{text-align:right}.victory-overlay{position:absolute;inset:0;z-index:30;display:flex;align-items:center;justify-content:center;padding:18px;background:rgba(3,7,12,.68);backdrop-filter:blur(3px);opacity:0;visibility:hidden;transition:opacity .28s ease,visibility .28s ease;pointer-events:none}.victory-overlay.show{opacity:1;visibility:visible}.victory-card{width:min(88%,330px);padding:22px 18px 20px;border-radius:22px;text-align:center;background:linear-gradient(180deg,rgba(17,25,39,.97),rgba(6,10,17,.98));border:1px solid #ffffff20;box-shadow:0 22px 60px #000b,inset 0 1px 0 #ffffff12;transform:translateY(28px) scale(.94);transition:transform .34s cubic-bezier(.2,.8,.2,1)}.victory-overlay.show .victory-card{transform:translateY(0) scale(1)}.victory-crown{font-size:42px;line-height:1;margin-bottom:9px;filter:drop-shadow(0 8px 12px #0008)}.victory-kicker{font-size:8px;font-weight:950;letter-spacing:.22em;color:#98a4b5}.victory-title{margin-top:5px;font-size:22px;font-weight:1000;letter-spacing:.02em}.victory-star{display:inline-flex;align-items:center;gap:6px;margin-top:12px;padding:8px 14px;border-radius:999px;background:#2b210b;border:1px solid #ffd66b55;color:#ffe08a;font-size:12px;font-weight:1000;box-shadow:0 0 22px #ffc94018}.victory-sub{margin-top:9px;font-size:8px;color:#8d99aa}.victory-overlay.red .victory-card{border-color:#ff5b6840;box-shadow:0 22px 60px #000b,0 0 38px #ff334418}.victory-overlay.blue .victory-card{border-color:#5797ff46;box-shadow:0 22px 60px #000b,0 0 38px #3985ff1c}@media(max-width:390px){.victory-card{width:min(88%,300px);padding:19px 15px}.victory-title{font-size:19px}.victory-crown{font-size:36px}}\n</style>\n'''
+          if 'id="victory-stars-style"' not in s:
+            s=s.replace('</head>',css+'</head>')
+
+          # Add star counters below realm names.
+          s=s.replace('<div class="realm">🔴 REINO DO CAOS</div><div class="points" id="redPower">', '<div class="realm">🔴 REINO DO CAOS<div class="star-score" id="redStars">0 ⭐</div></div><div class="points" id="redPower">')
+          s=s.replace('<div class="realm blue">🔵 REINO DA LUZ<div class="points" id="bluePower">', '<div class="realm blue">🔵 REINO DA LUZ<div class="star-score" id="blueStars">0 ⭐</div><div class="points" id="bluePower">')
+
+          # Add victory overlay to battlefield.
+          anchor='<div class="castle blue"><img id="blueCastleImg" alt="Castelo da Luz"><div class="hp"><i id="blueHp"></i></div></div>'
+          overlay='''<div class="castle blue"><img id="blueCastleImg" alt="Castelo da Luz"><div class="hp"><i id="blueHp"></i></div></div><div class="victory-overlay" id="victoryOverlay"><div class="victory-card"><div class="victory-crown">👑</div><div class="victory-kicker">FIM DA BATALHA</div><div class="victory-title" id="victoryTitle">VITÓRIA</div><div class="victory-star">⭐ +1 ESTRELA</div><div class="victory-sub" id="victorySub">Prepare-se para a próxima rodada</div></div></div>'''
+          if 'id="victoryOverlay"' not in s:
+            if anchor not in s: raise SystemExit('overlay anchor miss')
+            s=s.replace(anchor,overlay,1)
+
+          # Add star state next to game state variables.
+          old="spawnSeq={red:0,blue:0},ended=false,peer=null,conn=null;"
+          new="spawnSeq={red:0,blue:0},ended=false,redStars=Number(sessionStorage.getItem('1game-red-stars')||0),blueStars=Number(sessionStorage.getItem('1game-blue-stars')||0),peer=null,conn=null;"
+          if old in s:
+            s=s.replace(old,new,1)
+          elif "redStars=Number(sessionStorage.getItem('1game-red-stars')" not in s:
+            raise SystemExit('state anchor miss')
+
+          # Insert helpers before hitCastle.
+          hit='function hitCastle(team,d){'
+          helpers="""function updateStars(){const r=$('redStars'),b=$('blueStars');if(r)r.textContent=redStars+' ⭐';if(b)b.textContent=blueStars+' ⭐'}function saveStars(){try{sessionStorage.setItem('1game-red-stars',String(redStars));sessionStorage.setItem('1game-blue-stars',String(blueStars))}catch{}}function showVictory(winner){if(ended)return;ended=true;if(winner==='red')redStars++;else blueStars++;saveStars();updateStars();const o=$('victoryOverlay');if(o){o.className='victory-overlay show '+winner;$('victoryTitle').textContent=winner==='red'?'🔴 REINO DO CAOS VENCEU':'🔵 REINO DA LUZ VENCEU';$('victorySub').textContent='Placar: 🔴 '+redStars+' ⭐  ·  🔵 '+blueStars+' ⭐'}document.querySelector('.clash').textContent=winner==='red'?'🔴 VITÓRIA DO CAOS':'🔵 VITÓRIA DA LUZ';sendState(true)}function hideVictory(){const o=$('victoryOverlay');if(o)o.className='victory-overlay'}function resetMatch(){redStars=0;blueStars=0;saveStars();updateStars();reset()}"""
+          if 'function showVictory(winner)' not in s:
+            if hit not in s: raise SystemExit('hitCastle anchor miss')
+            s=s.replace(hit,helpers+hit,1)
+
+          # Replace old winner block inside hitCastle.
+          oldwin="if(redHp<=0||blueHp<=0){ended=true;document.querySelector('.clash').textContent=redHp<=0?'🔵 REINO DA LUZ VENCEU':'🔴 REINO DO CAOS VENCEU'}sendState()"
+          newwin="if(redHp<=0||blueHp<=0){showVictory(redHp<=0?'blue':'red');return}sendState()"
+          if oldwin in s:
+            s=s.replace(oldwin,newwin,1)
+          elif "showVictory(redHp<=0?'blue':'red')" not in s:
+            raise SystemExit('winner block miss')
+
+          # Reset hides overlay but keeps stars.
+          oldreset="ended=false;$('redHp').style.width=$('blueHp').style.width='100%';document.querySelector('.clash').textContent='⚔ CAMPO DE BATALHA ⚔';update();sendState()"
+          newreset="ended=false;hideVictory();$('redHp').style.width=$('blueHp').style.width='100%';document.querySelector('.clash').textContent='⚔ CAMPO DE BATALHA ⚔';updateStars();update();sendState(true)"
+          if oldreset in s:
+            s=s.replace(oldreset,newreset,1)
+          elif 'hideVictory();' not in s:
+            raise SystemExit('reset block miss')
+
+          # Add reset_match action to manifest.
+          oldactions="['reset','Resetar batalha']"
+          newactions="['reset','Resetar batalha'],['reset_match','Zerar confronto']"
+          if oldactions in s:
+            s=s.replace(oldactions,newactions,1)
+
+          # Correct icon/description for reset_match via mapped object expression.
+          s=s.replace("icon:id==='reset'?'🔄':", "icon:id==='reset'?'🔄':id==='reset_match'?'🧹':")
+          s=s.replace("description:id==='reset'?'Reinicia a batalha':", "description:id==='reset'?'Reinicia a batalha':id==='reset_match'?'Zera as estrelas e inicia um novo confronto':")
+
+          # Command handling.
+          oldcmd="else if(d.action==='reset')reset()"
+          newcmd="else if(d.action==='reset')reset();else if(d.action==='reset_match')resetMatch()"
+          if oldcmd in s:
+            s=s.replace(oldcmd,newcmd,1)
+          elif "d.action==='reset_match'" not in s:
+            raise SystemExit('command block miss')
+
+          # State payload includes stars.
+          s=s.replace("red:{units:units.filter(u=>u.team==='red'&&u.hp>0).length,hp:redHp},blue:{units:units.filter(u=>u.team==='blue'&&u.hp>0).length,hp:blueHp}", "red:{units:units.filter(u=>u.team==='red'&&u.hp>0).length,hp:redHp,stars:redStars},blue:{units:units.filter(u=>u.team==='blue'&&u.hp>0).length,hp:blueHp,stars:blueStars}")
+
+          # Ensure star HUD is initialized after reset startup too.
+          s=s.replace('loadAssets();reset();connect();', 'loadAssets();updateStars();reset();connect();')
+
+          p.write_text(s)
+          print('Victory + stars patch applied')
+          PY
+      - name: Sanity checks
+        run: |
+          grep -q 'victoryOverlay' game.html
+          grep -q 'function showVictory' game.html
+          grep -q 'reset_match' game.html
+          grep -q 'redStars' game.html
+          grep -q 'blueStars' game.html
+      - name: Commit
+        run: |
+          git config user.name ghostzinho
+          git config user.email wallissonghost@gmail.com
+          git add game.html
+          git commit -m "gameplay: adicionar tela de vitória e estrelas por rodada"
+          git push
