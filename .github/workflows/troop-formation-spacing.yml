@@ -1,0 +1,59 @@
+name: Troop Formation Spacing
+on:
+  push:
+    paths:
+      - '.github/workflows/troop-formation-spacing.yml'
+permissions:
+  contents: write
+jobs:
+  patch:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Add troop formation and ally spacing
+        run: |
+          python3 - <<'PY'
+          from pathlib import Path
+          p=Path('game.html')
+          s=p.read_text()
+
+          old_spawn="""function spawnPoint(team){const o=[0,-55,55,-100,100,-145,145,-25,25,-75,75],i=spawnSeq[team]++;return{x:team==='red'?85:battle.clientWidth-105,y:clamp(battle.clientHeight*.48+o[i%o.length],28,battle.clientHeight-38)}}"""
+          new_spawn="""function spawnPoint(team){const i=spawnSeq[team]++,laneCount=13,lane=i%laneCount,row=(i/laneCount)|0,laneGap=22,center=battle.clientHeight*.48,laneOffset=(lane-(laneCount-1)/2)*laneGap,stagger=((row&1)?laneGap*.5:0),y=clamp(center+laneOffset+stagger,34,battle.clientHeight-42),depth=(row%9)*18,x=team==='red'?85-depth:battle.clientWidth-105+depth;return{x,y,formationY:y,formationLane:lane,formationRow:row}}"""
+          if old_spawn not in s:
+            raise SystemExit('PATCH MISS: spawnPoint')
+          s=s.replace(old_spawn,new_spawn)
+
+          old_obj="""units.push({el,img,team,x:p.x,y:p.y,hp:UNIT_HP,atk:0,counted:false,attackingCastle:false,fighting:false,target:null,targetIsCastle:false,frame:0,anim:Math.random()*.09,facing:team==='red'?1:-1})"""
+          new_obj="""units.push({el,img,team,x:p.x,y:p.y,formationY:p.formationY,formationLane:p.formationLane,formationRow:p.formationRow,hp:UNIT_HP,atk:0,counted:false,attackingCastle:false,fighting:false,target:null,targetIsCastle:false,frame:0,anim:Math.random()*.09,facing:team==='red'?1:-1})"""
+          if old_obj not in s:
+            raise SystemExit('PATCH MISS: spawn unit object')
+          s=s.replace(old_obj,new_obj)
+
+          marker="""function chooseTargets(){rebuildSpatial();for(const u of units){if(u.hp<=0)continue;const own=castlePoint(u.team),targetCastle=castlePoint(u.team==='red'?'blue':'red');let target=enemyNear(u);if(!target){const defender=castleAttackers[u.team];if(defender&&defender.hp>0&&Math.hypot(u.x-own.x,u.y-own.y)<150)target=defender}u.target=target||targetCastle;u.targetIsCastle=!target}}"""
+          addition=marker+"""function allySeparation(u){const cx=(u.x/PERF_CELL)|0,cy=(u.y/PERF_CELL)|0,min=24,min2=min*min;let sx=0,sy=0,n=0;for(let gx=cx-1;gx<=cx+1;gx++)for(let gy=cy-1;gy<=cy+1;gy++){const a=spatial.get(gx+','+gy);if(!a)continue;for(const v of a){if(v===u||v.hp<=0||v.team!==u.team)continue;const dx=u.x-v.x,dy=u.y-v.y,d2=dx*dx+dy*dy;if(d2>0&&d2<min2){const d=Math.sqrt(d2),push=(min-d)/min;sx+=dx/d*push;sy+=dy/d*push;n++}else if(d2===0){sx+=(u.formationLane%2?1:-1);sy+=(u.formationRow%2?1:-1);n++}}}return n?{x:sx/n,y:sy/n}:{x:0,y:0}}"""
+          if marker not in s:
+            raise SystemExit('PATCH MISS: chooseTargets')
+          s=s.replace(marker,addition)
+
+          old_move="""const tx=target.x,ty=target.y,dx=tx-u.x,dy=ty-u.y,d=Math.hypot(dx,dy),isCastle=!!u.targetIsCastle;let moving=false;if(!isCastle&&d<=UNIT_RANGE){u.attackingCastle=false;if(!u.fighting){u.fighting=true;u.el.classList.add('fight')}if(u.atk<=0){u.atk=ATTACK_CD;target.hp-=UNIT_DAMAGE;if(target.hp<=0)kill(target)}}else if(isCastle&&d<=CASTLE_RANGE){u.attackingCastle=true;if(!u.fighting){u.fighting=true;u.el.classList.add('fight')}if(u.atk<=0){u.atk=ATTACK_CD;hitCastle(u.team==='red'?'blue':'red',CASTLE_DAMAGE)}}else{moving=true;u.attackingCastle=false;if(u.fighting){u.fighting=false;u.el.classList.remove('fight')}if(d>1){u.x+=dx/d*UNIT_SPEED*dt;u.y+=dy/d*UNIT_SPEED*dt}}animateUnit(u,dt,moving,tx);"""
+          new_move="""const isCastle=!!u.targetIsCastle,rawTx=target.x,rawTy=target.y,farFromCastle=isCastle&&Math.abs(rawTx-u.x)>105,tx=rawTx,ty=farFromCastle?u.formationY:rawTy,dx=tx-u.x,dy=ty-u.y,d=Math.hypot(dx,dy),castleD=isCastle?Math.hypot(rawTx-u.x,rawTy-u.y):d;let moving=false;if(!isCastle&&d<=UNIT_RANGE){u.attackingCastle=false;if(!u.fighting){u.fighting=true;u.el.classList.add('fight')}if(u.atk<=0){u.atk=ATTACK_CD;target.hp-=UNIT_DAMAGE;if(target.hp<=0)kill(target)}}else if(isCastle&&castleD<=CASTLE_RANGE){u.attackingCastle=true;if(!u.fighting){u.fighting=true;u.el.classList.add('fight')}if(u.atk<=0){u.atk=ATTACK_CD;hitCastle(u.team==='red'?'blue':'red',CASTLE_DAMAGE)}}else{moving=true;u.attackingCastle=false;if(u.fighting){u.fighting=false;u.el.classList.remove('fight')}if(d>1){let vx=dx/d,vy=dy/d;const sep=allySeparation(u),sepWeight=isCastle?.82:.48;vx+=sep.x*sepWeight;vy+=sep.y*sepWeight;const vl=Math.hypot(vx,vy)||1;u.x+=vx/vl*UNIT_SPEED*dt;u.y+=vy/vl*UNIT_SPEED*dt;if(farFromCastle)u.y+=(u.formationY-u.y)*Math.min(1,dt*2.4)}}animateUnit(u,dt,moving,tx);"""
+          if old_move not in s:
+            raise SystemExit('PATCH MISS: movement block')
+          s=s.replace(old_move,new_move)
+
+          p.write_text(s)
+          print('Troop formation spacing applied')
+          PY
+      - name: Sanity checks
+        run: |
+          grep -q "laneCount=13" game.html
+          grep -q "function allySeparation" game.html
+          grep -q "formationY" game.html
+          grep -q "farFromCastle" game.html
+      - name: Commit
+        run: |
+          git config user.name ghostzinho
+          git config user.email wallissonghost@gmail.com
+          git add game.html
+          git commit -m "gameplay: formar tropas com espacamento e linhas de avancao"
+          git push
