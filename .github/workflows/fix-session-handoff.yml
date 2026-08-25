@@ -1,0 +1,44 @@
+name: Fix session handoff
+on:
+  push:
+    paths:
+      - '.github/workflows/fix-session-handoff.yml'
+permissions:
+  contents: write
+jobs:
+  patch:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Patch lobby and game handoff
+        run: |
+          python - <<'PY'
+          from pathlib import Path
+
+          # Lobby: preserve session/token and navigate; let unload close transport naturally.
+          p=Path('index.html')
+          s=p.read_text()
+          old="try{conn?.close();peer?.destroy()}catch{}location.href='game.html'"
+          new="try{sessionStorage.setItem('1game-handoff','1')}catch{}location.href='game.html'"
+          if old not in s:
+              raise SystemExit('index handoff pattern not found')
+          s=s.replace(old,new,1)
+          p.write_text(s)
+
+          # Game: reconnect with the SAME client identity used by lobby and retry during peer-id release.
+          p=Path('game.html')
+          s=p.read_text()
+          old="function connect(){if(!panelCode)return;$('linkStatus').textContent='CONECTANDO';peer=new Peer(undefined,{debug:0});peer.on('open',()=>{conn=peer.connect('liveplus-session-'+panelCode.toLowerCase(),{reliable:true,serialization:'json'});conn.on('open',()=>conn.send({type:'session_hello',protocol:'liveplus-match-v1',token:sessionToken||undefined}));conn.on('data',d=>{if(d?.type==='session_accept'){sessionToken=d.token||sessionToken;sessionStorage.setItem('1game-session-token',sessionToken);$('linkStatus').textContent='PAINEL ON';$('linkStatus').classList.add('on');conn.send(manifest());sendState()}else command(d)});conn.on('close',()=>{$('linkStatus').textContent='DESCONECTADO';$('linkStatus').classList.remove('on')})})}"
+          new="function connect(attempt=0){if(!panelCode)return;$('linkStatus').textContent=attempt?'RECONECTANDO':'CONECTANDO';try{peer?.destroy()}catch{}const clientId='1game-client-'+panelCode.toLowerCase();peer=new Peer(clientId,{debug:0});peer.on('open',()=>{conn=peer.connect('liveplus-session-'+panelCode.toLowerCase(),{reliable:true,serialization:'json'});conn.on('open',()=>conn.send({type:'session_hello',protocol:'liveplus-match-v1',token:sessionToken||undefined}));conn.on('data',d=>{if(d?.type==='session_accept'){sessionToken=d.token||sessionToken;sessionStorage.setItem('1game-session-token',sessionToken);sessionStorage.removeItem('1game-handoff');$('linkStatus').textContent='PAINEL ON';$('linkStatus').classList.add('on');conn.send(manifest());sendState()}else command(d)});conn.on('close',()=>{$('linkStatus').textContent='RECONECTANDO';$('linkStatus').classList.remove('on');setTimeout(()=>connect(attempt+1),700)})});peer.on('error',e=>{if((e?.type==='unavailable-id'||e?.type==='peer-unavailable'||e?.type==='network')&&attempt<12){$('linkStatus').textContent='RECONECTANDO';setTimeout(()=>connect(attempt+1),500+attempt*120)}else{$('linkStatus').textContent='DESCONECTADO';$('linkStatus').classList.remove('on')}})}"
+          if old not in s:
+              raise SystemExit('game connect pattern not found')
+          s=s.replace(old,new,1)
+          p.write_text(s)
+          PY
+      - name: Commit fix
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add index.html game.html
+          git commit -m "fix: manter painel conectado ao sair do lobby" || exit 0
+          git push
