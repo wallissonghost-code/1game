@@ -1,0 +1,55 @@
+name: Apply blue mob skin
+
+on:
+  push:
+    paths:
+      - '.github/workflows/patch-blue-skin.yml'
+
+permissions:
+  contents: write
+
+jobs:
+  patch:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Patch blue skin into game
+        shell: python
+        run: |
+          from pathlib import Path
+
+          p = Path('game.html')
+          s = p.read_text(encoding='utf-8')
+
+          s = s.replace('.unit.red>i{display:none}', '.unit.red>i,.unit.blue>i{display:none}')
+          s = s.replace('.unit.red.fight .mob-sprite{filter:drop-shadow(0 4px 4px #0008) brightness(1.08)}.unit.blue.fight{animation:fight .24s ease-in-out infinite alternate}', '.unit.red.fight .mob-sprite,.unit.blue.fight .mob-sprite{filter:drop-shadow(0 4px 4px #0008) brightness(1.08)}')
+          s = s.replace('.unit.red.dead .mob-sprite{transform:rotate(70deg) scale(.65)!important}.unit.blue.dead{transform:rotate(70deg) scale(.6)!important}', '.unit.red.dead .mob-sprite,.unit.blue.dead .mob-sprite{transform:rotate(70deg) scale(.65)!important}')
+
+          old = "const RED_FRAMES=Array.from({length:9},(_,i)=>`./assets/mobs/frame_${String(i+1).padStart(3,'0')}.png`);RED_FRAMES.forEach(src=>{const i=new Image();i.src=src});"
+          new = "const RED_FRAMES=Array.from({length:9},(_,i)=>`./assets/mobs/frame_${String(i+1).padStart(3,'0')}.png`);const BLUE_FRAMES=Array.from({length:8},(_,i)=>`./assets/frame_${String(i+1).padStart(3,'0')}%202.png`);[...RED_FRAMES,...BLUE_FRAMES].forEach(src=>{const i=new Image();i.src=src});"
+          if old not in s:
+              raise SystemExit('RED_FRAMES pattern not found')
+          s = s.replace(old, new)
+
+          old = "if(team==='red')el.innerHTML=`<img class=\"mob-sprite\" src=\"${RED_FRAMES[0]}\" alt=\"\">`;else el.innerHTML='<i class=\"h\"></i><i class=\"b\"></i><i class=\"s\"></i>';"
+          new = "const frames=team==='red'?RED_FRAMES:BLUE_FRAMES;el.innerHTML=`<img class=\"mob-sprite\" src=\"${frames[0]}\" alt=\"\">`;"
+          if old not in s:
+              raise SystemExit('spawn skin pattern not found')
+          s = s.replace(old, new)
+
+          old = "function animateRed(u,dt,moving,targetX){if(u.team!=='red')return;const img=u.el.querySelector('.mob-sprite');if(!img)return;u.facing=targetX<u.x?-1:1;u.anim+=dt;if(moving&&u.anim>=.085){u.anim=0;u.frame=(u.frame+1)%RED_FRAMES.length;img.src=RED_FRAMES[u.frame]}else if(!moving&&u.anim>=.14){u.anim=0;u.frame=(u.frame+1)%RED_FRAMES.length;img.src=RED_FRAMES[u.frame]}img.style.transform=`scaleX(${u.facing})`}"
+          new = "function animateUnit(u,dt,moving,targetX){const img=u.el.querySelector('.mob-sprite');if(!img)return;const frames=u.team==='red'?RED_FRAMES:BLUE_FRAMES;const dir=targetX<u.x?-1:1;const native=u.team==='red'?1:-1;u.facing=dir;u.anim+=dt;if(moving&&u.anim>=.085){u.anim=0;u.frame=(u.frame+1)%frames.length;img.src=frames[u.frame]}else if(!moving&&u.anim>=.14){u.anim=0;u.frame=(u.frame+1)%frames.length;img.src=frames[u.frame]}img.style.transform=`scaleX(${dir*native})`}"
+          if old not in s:
+              raise SystemExit('animateRed pattern not found')
+          s = s.replace(old, new)
+          s = s.replace('animateRed(u,dt,moving,tx);', 'animateUnit(u,dt,moving,tx);')
+          s = s.replace("version:'0.3'", "version:'0.4'")
+
+          p.write_text(s, encoding='utf-8')
+      - name: Commit patched game
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add game.html
+          git diff --cached --quiet || git commit -m "feat: aplicar animação azul B001-B008"
+          git push
