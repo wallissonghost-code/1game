@@ -1,0 +1,32 @@
+name: Manifest real previews
+on:
+  workflow_dispatch:
+  push:
+    paths:
+      - '.github/workflows/manifest-real-previews.yml'
+permissions:
+  contents: write
+jobs:
+  patch:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Patch action labels and previews
+        run: |
+          python3 - <<'PY'
+          from pathlib import Path
+          p=Path('game.html')
+          s=p.read_text()
+          old="actions:[['spawn_red_1','Caos +1'],['spawn_red_3','Caos +3'],['spawn_red_10','Caos +10'],['spawn_red_40','Caos +40'],['spawn_blue_1','Luz +1'],['spawn_blue_3','Luz +3'],['spawn_blue_10','Luz +10'],['spawn_blue_40','Luz +40'],['reset','Resetar batalha']].map(([id,label])=>({id,label,icon:id==='reset'?'🔄':'🪖',description:id==='reset'?'Reinicia a batalha':'Adiciona tropas ao time'}))"
+          new="actions:[['spawn_red_1','Vermelho +1'],['spawn_red_3','Vermelho +3'],['spawn_red_10','Vermelho +10'],['spawn_red_40','Vermelho +40'],['spawn_blue_1','Azul +1'],['spawn_blue_3','Azul +3'],['spawn_blue_10','Azul +10'],['spawn_blue_40','Azul +40'],['reset','Resetar batalha']].map(([id,label])=>({id,label,icon:id==='reset'?'🔄':(id.includes('_red_')?'🔴':'🔵'),iconImage:id==='reset'?'':(id.includes('_red_')?'https://wallissonghost-code.github.io/1game/assets/mobs/frame_001.png':'https://wallissonghost-code.github.io/1game/assets/frame_001%202.png'),description:id==='reset'?'Reinicia a batalha':(id.includes('_red_')?'Adiciona guerreiros ao time vermelho':'Adiciona guerreiros ao time azul')}))"
+          if old not in s:
+              raise SystemExit('manifest block not found')
+          p.write_text(s.replace(old,new,1))
+          PY
+      - name: Commit
+        run: |
+          git config user.name "ghostzinho"
+          git config user.email "wallissonghost@gmail.com"
+          git add game.html
+          git commit -m "ui: previews reais e nomes Vermelho Azul no manifesto" || exit 0
+          git push
