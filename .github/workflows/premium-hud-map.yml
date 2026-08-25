@@ -1,0 +1,70 @@
+name: Apply premium HUD and map
+on:
+  push:
+    paths:
+      - '.github/workflows/premium-hud-map.yml'
+jobs:
+  patch:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/checkout@v4
+      - name: Patch premium HUD and map
+        run: |
+          python3 - <<'PY'
+          from pathlib import Path
+          p = Path('game.html')
+          s = p.read_text(encoding='utf-8')
+
+          # Load active map from the asset manifest.
+          old = "$('redCastleImg').src=red.src;$('blueCastleImg').src=blue.src"
+          new = "$('redCastleImg').src=red.src;$('blueCastleImg').src=blue.src;const map=a.maps?.[a.active?.map];if(map?.src){battle.style.backgroundImage=`linear-gradient(180deg,rgba(5,12,18,.08),rgba(5,12,18,.22)),url('${map.src}')`;battle.style.backgroundSize=map.fit||'cover';battle.style.backgroundPosition=map.position||'center';battle.style.backgroundRepeat='no-repeat'}"
+          if old not in s:
+              raise SystemExit('loadAssets target not found')
+          s = s.replace(old, new, 1)
+
+          # Upgrade footer copy and chat interaction layout.
+          s = s.replace('<div class="live-title">⚔️ ESCOLHA SEU LADO</div>', '<div class="live-title"><span>⚔️ PRESENTES DA BATALHA</span><small>FORTALEÇA SEU REINO</small></div>', 1)
+          old_chat = '<div class="chat-choice"><span>💬 COMENTE</span><b class="chat-red">🔴 VERMELHO</b><b class="chat-blue">🔵 AZUL</b></div>'
+          new_chat = '<div class="chat-choice"><div class="chat-copy"><span>💬 ENTRE NA GUERRA</span><small>Escolha seu reino pelo chat</small></div><div class="chat-chips"><b class="chat-red"><i>🔴</i> VERMELHO</b><span>OU</span><b class="chat-blue"><i>🔵</i> AZUL</b></div></div>'
+          if old_chat not in s:
+              raise SystemExit('chat target not found')
+          s = s.replace(old_chat, new_chat, 1)
+
+          premium_css = r'''
+          /* Premium battle HUD v1 */
+          .battle{background-color:#24372c;background-image:radial-gradient(circle at 50% 38%,#536247,#374a35 38%,#1b2a23 78%);background-size:cover;background-position:center;background-repeat:no-repeat}
+          .battle:before{z-index:1;background:linear-gradient(90deg,rgba(2,8,13,.13),transparent 22%,transparent 78%,rgba(2,8,13,.13)),linear-gradient(180deg,rgba(3,9,14,.04),rgba(3,9,14,.16));pointer-events:none}
+          .lane{z-index:2;opacity:.36}
+          .livebar{position:relative;background:linear-gradient(180deg,#080e18 0%,#050910 100%);border-top:1px solid #ffffff14;padding:7px 10px max(9px,env(safe-area-inset-bottom));box-shadow:0 -12px 34px #0008}
+          .livebar:before{content:"";position:absolute;left:12%;right:12%;top:-1px;height:1px;background:linear-gradient(90deg,transparent,#d2b66e66,transparent)}
+          .live-title{display:flex;align-items:center;justify-content:center;gap:8px;margin-bottom:7px;font-size:8px;letter-spacing:.15em;color:#f5f7fb}
+          .live-title span{font-weight:950}.live-title small{font-size:6px;letter-spacing:.16em;color:#7f8a9a;font-weight:850}
+          .sides{gap:7px}
+          .side{border:1px solid #ffffff12;border-radius:14px;background:linear-gradient(180deg,rgba(18,27,41,.96),rgba(7,13,22,.98));padding:6px;box-shadow:inset 0 1px 0 #ffffff08,0 8px 20px #0004}
+          .side.red{border-color:#ff5b681f}.side.blue{border-color:#5797ff24}
+          .side.red:before,.side.blue:before{opacity:.16}
+          .side-head{margin-bottom:5px;font-size:8px;letter-spacing:.12em}
+          .rules{gap:5px}
+          .rule{height:44px;gap:5px;padding:4px 6px;border-radius:10px;background:linear-gradient(180deg,#0a111d,#070c14);border-color:#ffffff0d;box-shadow:inset 0 1px 0 #ffffff08}
+          .giftimg{width:31px;height:31px;filter:drop-shadow(0 5px 7px #0009)}
+          .action{font-size:9px;letter-spacing:.01em;text-shadow:0 1px 6px #000}
+          .chat-choice{margin-top:7px;display:flex;align-items:center;justify-content:space-between;gap:8px;padding:7px 9px;border:1px solid #ffffff13;border-radius:13px;background:linear-gradient(90deg,#0b121e,#08101a 50%,#0b121e);box-shadow:inset 0 1px 0 #ffffff08}
+          .chat-copy{display:flex;flex-direction:column;gap:1px;min-width:0}.chat-copy>span{font-size:7px;font-weight:950;letter-spacing:.14em;color:#d9e0ea;white-space:nowrap}.chat-copy small{font-size:6px;letter-spacing:.02em;color:#687587;white-space:nowrap}
+          .chat-chips{display:flex;align-items:center;gap:4px}.chat-chips>span{font-size:5px;color:#596578;font-weight:900}
+          .chat-choice b{display:flex;align-items:center;gap:3px;padding:6px 7px;border-radius:9px;background:#060b12;border:1px solid #ffffff10;font-size:8px;font-weight:950;letter-spacing:.03em;box-shadow:inset 0 1px 0 #ffffff08;white-space:nowrap}
+          .chat-choice b i{font-style:normal;font-size:9px}.chat-red{color:#ffb0b8!important;border-color:#ff536129!important;background:linear-gradient(180deg,#160d14,#090b11)!important}.chat-blue{color:#b7d2ff!important;border-color:#4b8cff2c!important;background:linear-gradient(180deg,#0a1220,#080b11)!important}
+          @media(max-width:390px) and (orientation:portrait){.live-title small{display:none}.chat-copy small{display:none}.chat-choice{padding:6px 7px}.chat-choice b{padding:5px 6px;font-size:7px}.giftimg{width:29px;height:29px}.rule{height:42px}}
+          @media(orientation:landscape){.livebar{padding-top:5px}.live-title{margin-bottom:4px}.rule{height:37px}.giftimg{width:27px;height:27px}.chat-choice{margin-top:4px;padding:4px 7px}.chat-choice b{padding:4px 6px}}
+          '''
+          s = s.replace('</style>', premium_css + '</style>', 1)
+          p.write_text(s, encoding='utf-8')
+          PY
+      - name: Commit changes
+        run: |
+          git config user.name "ghostzinho"
+          git config user.email "wallissonghost@gmail.com"
+          git add game.html
+          git commit -m "style: HUD premium e mapa ativo" || exit 0
+          git push
