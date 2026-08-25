@@ -1,0 +1,38 @@
+name: Patch live comments and zero spawn
+on:
+  push:
+    paths:
+      - '.github/workflows/patch-live-comments.yml'
+permissions:
+  contents: write
+jobs:
+  patch:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Patch game
+        run: |
+          python - <<'PY'
+          from pathlib import Path
+          p=Path('game.html')
+          s=p.read_text()
+          s=s.replace("function spawn(team,n=1){n=Math.max(0,Math.min(200,Number(n)||0));", "function spawn(team,n=1){if(ended)return;n=Math.max(0,Math.min(200,Number(n)||0));")
+          s=s.replace("document.querySelector('.clash').textContent='⚔ CAMPO DE BATALHA ⚔';spawn('red',5);spawn('blue',5);update()", "document.querySelector('.clash').textContent='⚔ CAMPO DE BATALHA ⚔';update();sendState()")
+          css=".chat-choice{margin-top:8px;display:grid;grid-template-columns:auto 1fr 1fr;align-items:center;gap:7px;padding:7px 9px;border:1px solid #ffffff14;border-radius:12px;background:#070d16;font-size:8px;font-weight:900;letter-spacing:.08em;color:#9ca8b8}.chat-choice b{font-size:10px;letter-spacing:.02em}.chat-red{color:#ff9ca6}.chat-blue{color:#8db8ff}@media(orientation:landscape){.chat-choice{margin-top:5px;padding:5px 8px}}"
+          marker=".blue .action{color:#bad4ff}"
+          if css not in s:
+              s=s.replace(marker, marker+css)
+          block='<div class="chat-choice"><span>💬 COMENTE</span><b class="chat-red">🔴 VERMELHO</b><b class="chat-blue">🔵 AZUL</b></div>'
+          needle='</section></div></footer></main>'
+          if block not in s:
+              s=s.replace(needle, '</section></div>'+block+'</footer></main>')
+          p.write_text(s)
+          PY
+          git rm .github/workflows/patch-live-comments.yml
+      - name: Commit
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add game.html
+          git commit -m "feat: comentários por time e spawn somente via painel"
+          git push
