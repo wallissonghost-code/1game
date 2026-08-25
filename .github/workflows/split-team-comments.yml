@@ -1,0 +1,34 @@
+name: Split team comments
+on:
+  workflow_dispatch:
+  push:
+    paths:
+      - '.github/workflows/split-team-comments.yml'
+permissions:
+  contents: write
+jobs:
+  patch:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Patch team comments layout
+        run: |
+          python3 - <<'PY'
+          from pathlib import Path
+          p=Path('game.html')
+          s=p.read_text()
+          marker='/* Split team comments v1 */'
+          if marker not in s:
+              css='''\n<style>\n/* Split team comments v1 */\n.side{display:flex;flex-direction:column}.side .rules{flex:1}.team-comment{position:relative;z-index:2;margin-top:7px;display:flex;align-items:center;justify-content:space-between;gap:7px;padding:7px 9px;border-radius:11px;border:1px solid #ffffff12;background:linear-gradient(180deg,#09111bd9,#060b12e8);box-shadow:inset 0 1px 0 #ffffff08}.team-comment .comment-kicker{font-size:7px;font-weight:900;letter-spacing:.11em;color:#7e8999;white-space:nowrap}.team-comment .comment-word{font-size:10px;font-weight:950;letter-spacing:.04em;padding:5px 8px;border-radius:999px;white-space:nowrap}.side.red .team-comment{border-color:#ff53652c;background:linear-gradient(180deg,#251018b8,#090d15e8)}.side.blue .team-comment{border-color:#4b8dff2c;background:linear-gradient(180deg,#0d1a30b8,#090d15e8)}.side.red .comment-word{color:#ffb1ba;background:#38111a;border:1px solid #ff53653d}.side.blue .comment-word{color:#b9d4ff;background:#0d2240;border:1px solid #4b8dff3d}.chat-choice{display:none!important}@media(max-width:390px) and (orientation:portrait){.team-comment{padding:6px 7px;gap:4px}.team-comment .comment-kicker{font-size:6.5px}.team-comment .comment-word{font-size:9px;padding:4px 6px}}\n</style>\n'''
+              js='''\n<script>\n(()=>{const sides=document.querySelectorAll('.side');if(sides.length<2)return;const old=document.querySelector('.chat-choice');if(old)old.remove();const mk=(team,label,color)=>{const el=document.createElement('div');el.className='team-comment';el.innerHTML='<span class="comment-kicker">💬 COMENTE</span><b class="comment-word">'+color+' '+label+'</b>';return el};sides[0].appendChild(mk('red','VERMELHO','🔴'));sides[1].appendChild(mk('blue','AZUL','🔵'));})();\n</script>\n'''
+              s=s.replace('</head>',css+'</head>')
+              s=s.replace('</body>',js+'</body>')
+              p.write_text(s)
+          PY
+      - name: Commit changes
+        run: |
+          git config user.name "ghostzinho"
+          git config user.email "wallissonghost@gmail.com"
+          git add game.html
+          git diff --cached --quiet || git commit -m "style: comentários separados por time"
+          git push
