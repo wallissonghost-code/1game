@@ -1,0 +1,11 @@
+{
+  "name": "1game-battlefield",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "check:gameplay": "node scripts/gameplay-qa.mjs"
+  },
+  "devDependencies": {
+    "playwright": "^1.55.0"
+  }
+}
