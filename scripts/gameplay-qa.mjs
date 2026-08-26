@@ -36,12 +36,22 @@ async function runScenario(browser,name,viewport){
   const palMin=minDistance(pals);
   assert(palMin>=30,`[${name}] PALADIN OVERLAP: minimum center distance ${palMin.toFixed(1)}px (expected >=30px)`);
   const bw=viewport.width;
-  assert(pals.every(u=>u.x>=112&&u.x<=bw-112),`[${name}] CASTLE BODY OVERLAP: special unit entered player/castle body`);
+  assert(pals.every(u=>u.x>=86&&u.x<=bw-86),`[${name}] CASTLE BODY OVERLAP: special unit entered player/castle body`);
 
-  // Direction stability: moving toward one objective must not spin through directions every frame.
+  // Direction stability: blue special with no enemy must march left toward the red castle.
   const history=[];for(let i=0;i<18;i++){const s=await snap();history.push(s.units.find(u=>u.kind==='paladin')?.dir8);await sleep(110)}
   const clean=history.filter(Boolean),changes=clean.slice(1).reduce((n,v,i)=>n+(v!==clean[i]?1:0),0);
   assert(changes<=2,`[${name}] PALADIN DIRECTION FLICKER: ${changes} direction changes in ~2s (${clean.join(',')})`);
+  assert(clean.slice(-8).every(v=>v==='w'),`[${name}] PALADIN WRONG MARCH FACING: expected w/left, got ${clean.join(',')}`);
+
+  // Castle contact: one blue paladin must reach the red wall, face left and actually damage it.
+  await call('reset');await call('paladin');await sleep(7200);
+  const contact=await snap();const solo=contact.units.find(u=>u.kind==='paladin');
+  assert(solo,`[${name}] solo paladin disappeared before castle contact`);
+  assert(solo.dir8==='w',`[${name}] solo paladin reached objective facing ${solo.dir8}, expected w/left`);
+  assert(solo.x>=86,`[${name}] CASTLE OVERLAP: paladin center x=${solo.x.toFixed(1)} entered castle body`);
+  assert(solo.x<=112,`[${name}] CASTLE ATTACK TOO FAR: paladin center x=${solo.x.toFixed(1)} should be close to wall`);
+  assert(contact.redHp<100,`[${name}] CASTLE CONTACT FAILED: paladin reached wall but did not damage red castle`);
 
   // Mixed armies: both sides must stay alive, finite and inside a sane world envelope.
   await call('reset');await call('spawn','red',40);await call('spawn','blue',40);for(let i=0;i<4;i++)await call('paladin');await sleep(2500);
@@ -62,7 +72,7 @@ async function runScenario(browser,name,viewport){
   assert(stress.fps>=15,`[${name}] stress FPS collapsed: ${stress.fps}`);
   assert(errors.length===0,`[${name}] runtime errors under stress: ${errors.join(' | ')}`);
 
-  console.log(`1GAME QA OK [${name}] fps=${stress.fps} mobs=${stress.red+stress.blue} paladinMin=${palMin.toFixed(1)}px dirChanges=${changes}`);
+  console.log(`1GAME QA OK [${name}] fps=${stress.fps} mobs=${stress.red+stress.blue} paladinMin=${palMin.toFixed(1)}px dirChanges=${changes} contactX=${solo.x.toFixed(1)}`);
   await context.close();
 }
 
@@ -75,4 +85,4 @@ try{
   console.log('1GAME GAMEPLAY QA: ALL SCENARIOS PASSED');
 }finally{if(browser)await browser.close();server.kill('SIGTERM')}
 
-// QA trigger: castle-contact/paladin-facing v2
+// QA trigger: castle-contact/paladin-facing v3
