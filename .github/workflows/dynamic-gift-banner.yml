@@ -1,4 +1,4 @@
-name: Beta label timer
+name: Fullscreen overlay HUD
 on:
   push:
     paths:
@@ -10,23 +10,25 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
-      - name: Add beta version above timer
+      - name: Make battlefield full viewport with overlay HUD
         run: |
           python3 - <<'PY'
           from pathlib import Path
           p=Path('game.html')
           s=p.read_text()
-          css='''\n<style id="beta-version-v020">\n.timerbox{position:relative!important;margin-top:10px!important}\n.timerbox:before{content:"BETA 0.2.0";position:absolute;left:50%;bottom:calc(100% + 3px);transform:translateX(-50%);font-size:5.5px;line-height:1;font-weight:950;letter-spacing:.16em;color:#7f8a9a;white-space:nowrap;text-shadow:0 1px 4px #000}\n</style>\n'''
-          if 'id="beta-version-v020"' not in s:
+          css='''\n<style id="fullscreen-overlay-hud-v4">\n/* Caos Live architecture: gameplay owns the whole viewport; HUD floats over it. */\nhtml,body{width:100%;height:100%;min-height:100%;overflow:hidden!important;background:#080b12}.game{position:fixed!important;inset:0!important;display:block!important;width:100vw!important;height:100dvh!important;min-height:100dvh!important;max-height:100dvh!important;overflow:hidden!important;background:#0b111b}.battle{position:absolute!important;inset:0!important;min-height:0!important;z-index:1}.hud{position:absolute!important;left:0!important;right:0!important;top:0!important;z-index:40!important;background:linear-gradient(180deg,rgba(8,13,22,.98),rgba(8,13,22,.91),rgba(8,13,22,.72))!important;backdrop-filter:blur(4px)}.livebar{position:absolute!important;left:0!important;right:0!important;bottom:0!important;z-index:45!important;margin:0!important;height:auto!important;min-height:0!important;background:linear-gradient(180deg,rgba(6,10,17,.72) 0%,rgba(6,10,17,.94) 12%,#050910 100%)!important;backdrop-filter:blur(5px);padding-bottom:max(10px,env(safe-area-inset-bottom))!important}.battle:after{content:"";position:absolute;inset:0;pointer-events:none;z-index:2;background:linear-gradient(180deg,rgba(5,9,15,.30) 0,transparent 15%,transparent 68%,rgba(5,9,15,.15) 78%,rgba(5,9,15,.38) 100%)}.clash,.castle,.unit,.victory-overlay{z-index:4}.lane{z-index:3}.live-title,.sides{position:relative;z-index:2}.sides,.side,.rules,.team-comment{min-height:0!important}.side .rules{flex:none!important}\n@supports not (height:100dvh){.game{height:100vh!important;min-height:100vh!important;max-height:100vh!important}}\n</style>\n'''
+          if 'id="fullscreen-overlay-hud-v4"' not in s:
               s=s.replace('</head>',css+'</head>',1)
           p.write_text(s)
           PY
       - name: Check
-        run: grep -q 'BETA 0.2.0' game.html
+        run: |
+          grep -q 'fullscreen-overlay-hud-v4' game.html
+          grep -q 'inset:0!important' game.html
       - name: Commit
         run: |
           git config user.name ghostzinho
           git config user.email wallissonghost@gmail.com
           git add game.html
-          git commit -m "ui: exibir Beta 0.2.0 acima do timer"
+          git commit -m "layout: gameplay fullscreen com HUD sobreposto"
           git push
