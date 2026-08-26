@@ -1,0 +1,56 @@
+name: Install gameplay QA hook
+on:
+  push:
+    paths:
+      - '.github/workflows/install-gameplay-qa-hook.yml'
+permissions:
+  contents: write
+jobs:
+  patch:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Inject OneGameTest hook
+        run: |
+          python3 - <<'PY'
+          from pathlib import Path
+          p=Path('game.html')
+          s=p.read_text(encoding='utf-8')
+          marker='window.OneGameTest='
+          if marker in s:
+              raise SystemExit(0)
+          anchor='loadAssets();updateStars();reset();connect();'
+          hook=r'''window.OneGameTest={
+            snapshot(){
+              const alive=units.filter(u=>u.hp>0);
+              return {
+                time,ended,paused,redHp,blueHp,redDeaths,blueDeaths,
+                fps:Number(window.__battlePerf?.fps||60),perfMode:Number(window.__battlePerf?.mode||0),
+                red:alive.filter(u=>u.team==='red').length,
+                blue:alive.filter(u=>u.team==='blue').length,
+                paladins:alive.filter(u=>u.kind==='paladin').length,
+                units:alive.map(u=>({team:u.team,kind:u.kind||'mob',x:u.x,y:u.y,hp:u.hp,formationLane:u.formationLane,formationRow:u.formationRow,dir8:u.dir8??null,targetIsCastle:!!u.targetIsCastle,attackingCastle:!!u.attackingCastle}))
+              };
+            },
+            reset(){reset();return true},
+            spawn(team,n=1){spawn(team,n);return true},
+            paladin(){spawnBluePaladin();return true},
+            damageCastle(team,amount=10){hitCastle(team,Number(amount)||0);return true},
+            setTime(seconds){time=Math.max(0,Number(seconds)||0);return true},
+            finishTime(){finishByTime();return true},
+            pause(value=true){paused=!!value;return paused}
+          };'''
+          if anchor not in s:
+              raise SystemExit('QA anchor not found')
+          s=s.replace(anchor,hook+anchor,1)
+          p.write_text(s,encoding='utf-8')
+          PY
+      - name: Validate hook
+        run: grep -q "window.OneGameTest" game.html
+      - name: Commit
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add game.html
+          git diff --cached --quiet || git commit -m "test: expor OneGameTest para QA automático"
+          git push
