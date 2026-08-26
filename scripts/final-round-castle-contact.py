@@ -10,8 +10,7 @@ s=s.replace('.clash,.castle,.unit,.victory-overlay{z-index:4}', '.clash,.castle,
 # 2) Castle front/contact: proportional to the rendered castle width.
 old="function castleFrontAtY(y){const cy=battle.clientHeight*.48,dy=Math.abs(y-cy);if(dy<=54)return 86;if(dy<=78)return 72;return null}function castlePoint(team,u=null){const cy=battle.clientHeight*.48,y=clamp(u?.y??cy,cy-78,cy+78),front=castleFrontAtY(y)??80;return team==='red'?{x:front,y}:{x:battle.clientWidth-front,y}}"
 new="function castleContactScale(){const w=battle.querySelector('.castle.red')?.offsetWidth||112;return clamp(w/112,.9,1.18)}function castleFrontAtY(y){const scale=castleContactScale(),cy=battle.clientHeight*.48,dy=Math.abs(y-cy);if(dy<=54*scale)return 68*scale;if(dy<=78*scale)return 58*scale;return null}function castlePoint(team,u=null){const scale=castleContactScale(),cy=battle.clientHeight*.48,y=clamp(u?.y??cy,cy-78*scale,cy+78*scale),front=castleFrontAtY(y)??64*scale,r=u?unitRadius(u):0,gap=u?1.5:0,x=team==='red'?front+r+gap:battle.clientWidth-front-r-gap;return{x,y}}"
-if old not in s:
-    raise SystemExit('castle front/contact block not found')
+if old not in s: raise SystemExit('castle front/contact block not found')
 s=s.replace(old,new,1)
 
 old="function resolveCastleBodies(u){const r=unitRadius(u),front=castleFrontAtY(u.y);if(front==null)return;const left=front+r+1,right=battle.clientWidth-front-r-1;if(u.x<left)u.x=left;if(u.x>right)u.x=right;}"
@@ -41,7 +40,7 @@ if old not in s: raise SystemExit('loop guard not found')
 s=s.replace(old,new,1)
 
 needle="finishTime(){finishByTime();return true},\n  pause(value=true){paused=!!value;return paused}"
-repl="finishTime(){finishByTime();return true},\n  castleContactAt(y,radius=17){const scale=castleContactScale(),cy=battle.clientHeight*.48,ty=clamp(Number(y)||cy,cy-78*scale,cy+78*scale),front=castleFrontAtY(ty)??64*scale,r=Number(radius)||17;return{targetY:ty,front,safeLeft:front+r+1.5,safeRight:battle.clientWidth-front-r-1.5,scale}},\n  roundEndDiagnostics(){const overlay=$('victoryOverlay'),unitEls=[...battle.querySelectorAll('.unit')];return{ended,unitCount:unitEls.length,unitOpacity:unitEls.map(el=>getComputedStyle(el).opacity),overlayShown:!!overlay?.classList.contains('show'),overlayZ:Number(getComputedStyle(overlay).zIndex||0),castleScale:castleContactScale(),centerFront:castleFrontAtY(battle.clientHeight*.48),paladinStopRadius:3.5}},\n  pause(value=true){paused=!!value;return paused}"
+repl="finishTime(){finishByTime();return true},\n  setCastleHpForTest(team,hp){const v=Math.max(1,Number(hp)||100);if(team==='red')redHp=v;else blueHp=v;update();return team==='red'?redHp:blueHp},\n  castleContactAt(y,radius=17){const scale=castleContactScale(),cy=battle.clientHeight*.48,ty=clamp(Number(y)||cy,cy-78*scale,cy+78*scale),front=castleFrontAtY(ty)??64*scale,r=Number(radius)||17;return{targetY:ty,front,safeLeft:front+r+1.5,safeRight:battle.clientWidth-front-r-1.5,scale}},\n  roundEndDiagnostics(){const overlay=$('victoryOverlay'),unitEls=[...battle.querySelectorAll('.unit')];return{ended,unitCount:unitEls.length,unitOpacity:unitEls.map(el=>getComputedStyle(el).opacity),overlayShown:!!overlay?.classList.contains('show'),overlayZ:Number(getComputedStyle(overlay).zIndex||0),castleScale:castleContactScale(),centerFront:castleFrontAtY(battle.clientHeight*.48),paladinStopRadius:3.5}},\n  pause(value=true){paused=!!value;return paused}"
 if needle not in s: raise SystemExit('OneGameTest diagnostics anchor not found')
 s=s.replace(needle,repl,1)
 
