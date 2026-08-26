@@ -1,0 +1,19 @@
+name: Inspect paladin frames
+on:
+  push:
+    branches: [dev]
+    paths:
+      - '.github/workflows/inspect-paladin-frames.yml'
+  workflow_dispatch:
+jobs:
+  inspect:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: dev
+      - name: Install Pillow
+        run: python3 -m pip install --quiet pillow
+      - name: Print 32 frame visual matrix
+        run: python3 scripts/inspect-paladin-frames.py
