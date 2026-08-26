@@ -10,29 +10,31 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
-      - name: Improve gift proportions and comment actions
+      - name: Prioritize paid gift rewards in HUD
         run: |
           python3 - <<'PY'
           from pathlib import Path
           p=Path('game.html')
           s=p.read_text()
-          css='''\n<style id="gift-hud-v2">\n/* Gift HUD v2: use the available portrait space instead of tiny icons */\n.livebar{padding:9px 10px max(11px,env(safe-area-inset-bottom));justify-content:flex-start}.live-title{margin:0 0 8px}.side{padding:8px}.side-head{font-size:9px;margin-bottom:7px}.rules{gap:7px}.rule{min-width:0;height:58px;padding:5px 7px;gap:7px}.giftimg{flex:0 0 43px;width:43px;height:43px;object-fit:contain;filter:drop-shadow(0 5px 8px #000a)}.action{min-width:0;font-size:10px;line-height:1.05}.rule .gift-name{margin-top:4px!important;max-width:82px!important;font-size:6.5px!important;line-height:1.05;color:#8d99aa!important}.team-comment{min-height:46px;margin-top:8px;padding:6px 8px;display:grid;grid-template-columns:auto 1fr;grid-template-rows:auto auto;column-gap:7px;row-gap:2px}.team-comment .comment-kicker{grid-column:1;grid-row:1 / span 2;align-self:center}.team-comment .comment-word{grid-column:2;grid-row:1;padding:0!important;border:0!important;background:none!important;font-size:9px;text-align:right}.team-comment .comment-action{grid-column:2;grid-row:2;text-align:right;font-size:7px;font-weight:950;letter-spacing:.06em;color:#fff;white-space:nowrap}.side.red .comment-action{color:#ffbdc4}.side.blue .comment-action{color:#c4d9ff}.rule.sync-empty{opacity:.34}.rule.sync-empty .giftimg{filter:grayscale(1);opacity:.35}\n@media(max-width:430px) and (orientation:portrait){.game{grid-template-rows:auto minmax(0,1fr) minmax(246px,32vh)}.livebar{padding-left:9px;padding-right:9px}.sides{gap:8px}.rule{height:60px}.giftimg{flex-basis:45px;width:45px;height:45px}.action{font-size:9.5px}.team-comment{min-height:47px}}\n@media(max-width:375px) and (orientation:portrait){.game{grid-template-rows:auto minmax(0,1fr) minmax(238px,33vh)}.side{padding:6px}.rules{gap:5px}.rule{height:56px;padding:4px 5px;gap:4px}.giftimg{flex-basis:40px;width:40px;height:40px}.action{font-size:8.5px}.rule .gift-name{max-width:68px!important;font-size:5.8px!important}}\n</style>\n'''
-          if 'id="gift-hud-v2"' not in s:s=s.replace('</head>',css+'</head>',1)
-          # Make both comment cards structurally identical and show their actual game action.
-          old="const mk=(team,label,color)=>{const el=document.createElement('div');el.className='team-comment';el.innerHTML='<span class=\"comment-kicker\">💬 COMENTE</span><b class=\"comment-word\">'+color+' '+label+'</b>';return el};sides[0].appendChild(mk('red','VERMELHO','🔴'));sides[1].appendChild(mk('blue','AZUL','🔵'))"
-          new="const mk=(team,label,color)=>{const el=document.createElement('div');el.className='team-comment';el.innerHTML='<span class=\"comment-kicker\">💬 COMENTE</span><b class=\"comment-word\">'+color+' '+label+'</b><small class=\"comment-action\">+1 MOB</small>';return el};sides[0].appendChild(mk('red','VERMELHO','🔴'));sides[1].appendChild(mk('blue','AZUL','🔵'))"
-          if old in s:s=s.replace(old,new,1)
-          elif 'class=\"comment-action\"' not in s:raise SystemExit('comment anchor miss')
+          css='''\n<style id="gift-hud-v3">\n/* Paid gifts are the primary information: image + full reward, never clipped */\n@media(orientation:portrait){.game{grid-template-rows:auto minmax(0,1fr) minmax(288px,35vh)}.livebar{padding:8px 10px max(10px,env(safe-area-inset-bottom));justify-content:flex-start}.live-title{margin-bottom:7px}.sides{gap:8px}.side{padding:7px}.side-head{margin-bottom:6px}.rules{display:grid;grid-template-columns:1fr 1fr;gap:7px}.rule{height:82px;min-width:0;padding:6px 4px 5px;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:2px;text-align:center;overflow:hidden}.giftimg{flex:none;width:48px!important;height:48px!important;object-fit:contain;margin:0 auto;filter:drop-shadow(0 5px 8px #000a)}.action{display:flex;flex-direction:column;align-items:center;justify-content:center;width:100%;min-width:0;font-size:10px!important;font-weight:1000;line-height:1;white-space:normal!important;overflow:visible!important;text-overflow:clip!important}.rule .gift-name{order:-1;display:block!important;width:100%;max-width:100%!important;margin:0 0 2px!important;padding:0 2px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;font-size:5.8px!important;line-height:1;color:#8490a0!important;font-weight:800!important}.rule.sync-empty .gift-name{display:none!important}.rule.sync-empty .action:after{display:block;margin-top:2px;font-size:5px!important}.team-comment{min-height:42px;margin-top:7px;padding:5px 8px;display:grid;grid-template-columns:auto 1fr;grid-template-rows:auto auto;column-gap:6px;row-gap:1px}.team-comment .comment-kicker{grid-column:1;grid-row:1 / span 2;align-self:center;font-size:6px}.team-comment .comment-word{grid-column:2;grid-row:1;padding:0!important;border:0!important;background:none!important;text-align:right;font-size:8px!important}.team-comment .comment-action{grid-column:2;grid-row:2;text-align:right;font-size:6.5px;font-weight:1000;letter-spacing:.04em;white-space:nowrap}.side.red .comment-action{color:#ffbdc4}.side.blue .comment-action{color:#c4d9ff}}\n@media(max-width:390px) and (orientation:portrait){.game{grid-template-rows:auto minmax(0,1fr) minmax(276px,36vh)}.livebar{padding-left:8px;padding-right:8px}.side{padding:6px}.rules{gap:6px}.rule{height:78px}.giftimg{width:44px!important;height:44px!important}.action{font-size:9.5px!important}}\n@media(max-width:350px) and (orientation:portrait){.game{grid-template-rows:auto minmax(0,1fr) minmax(266px,37vh)}.rule{height:74px}.giftimg{width:40px!important;height:40px!important}.action{font-size:9px!important}}\n</style>\n'''
+          if 'id="gift-hud-v3"' not in s:s=s.replace('</head>',css+'</head>',1)
+          # Make reward labels read naturally.
+          s=s.replace('>+1 MOB<','>+1 MOB<').replace('>+3 MOB<','>+3 MOBS<').replace('>+10 MOB<','>+10 MOBS<').replace('>+40 MOB<','>+40 MOBS<')
+          # Keep comment as secondary interaction but always show its reward.
+          if 'class="comment-action"' not in s:
+            old="const mk=(team,label,color)=>{const el=document.createElement('div');el.className='team-comment';el.innerHTML='<span class=\"comment-kicker\">💬 COMENTE</span><b class=\"comment-word\">'+color+' '+label+'</b>';return el};"
+            new="const mk=(team,label,color)=>{const el=document.createElement('div');el.className='team-comment';el.innerHTML='<span class=\"comment-kicker\">💬 COMENTE</span><b class=\"comment-word\">'+color+' '+label+'</b><small class=\"comment-action\">+1 MOB</small>';return el};"
+            if old in s:s=s.replace(old,new,1)
           p.write_text(s)
           PY
       - name: Check
         run: |
-          grep -q 'gift-hud-v2' game.html
+          grep -q 'gift-hud-v3' game.html
           grep -q 'comment-action' game.html
       - name: Commit
         run: |
           git config user.name ghostzinho
           git config user.email wallissonghost@gmail.com
           git add game.html
-          git commit -m "ui: melhorar proporção dos presentes e ações do chat"
+          git commit -m "ui: destacar recompensas completas dos presentes"
           git push
