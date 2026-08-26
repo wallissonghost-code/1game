@@ -6,6 +6,7 @@ on:
       - '.github/workflows/fix-paladin-facing-contact.yml'
       - 'scripts/fix-paladin-facing-contact.py'
       - 'scripts/stamp-version.py'
+      - 'scripts/gameplay-qa.mjs'
   workflow_dispatch:
 permissions:
   contents: write
@@ -35,7 +36,7 @@ jobs:
         run: npm run check:release
       - name: Gameplay QA on patched tree
         run: npm run check:gameplay
-      - name: Commit exact tested game
+      - name: Commit exact tested build to dev
         run: |
           git config user.name 'github-actions[bot]'
           git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
@@ -44,5 +45,5 @@ jobs:
             git commit -m "fix: paladino cardinal + BETA 0.2.${{ github.run_number }} validados"
             git push origin HEAD:dev
           fi
-      - name: Promote exact tested tree to main
+      - name: Promote exact tested build to main
         run: git push origin HEAD:main
