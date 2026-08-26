@@ -14,7 +14,7 @@ async function run(browser,name,viewport){
   const errors=[];
   page.on('pageerror',e=>errors.push(e.message));
   await page.goto(`${BASE}/game.html?finalqa=1&t=${Date.now()}`,{waitUntil:'domcontentloaded',timeout:30000});
-  await page.waitForFunction(()=>window.OneGameTest?.roundEndDiagnostics,{timeout:10000});
+  await page.waitForFunction(()=>window.OneGameTest?.roundEndDiagnostics&&window.OneGameTest?.castleContactAt,{timeout:10000});
   const call=(method,...args)=>page.evaluate(({method,args})=>window.OneGameTest[method](...args),{method,args});
   const snap=()=>page.evaluate(()=>window.OneGameTest.snapshot());
 
@@ -36,12 +36,16 @@ async function run(browser,name,viewport){
     const pals=s.units.filter(u=>u.kind==='paladin');
     assert(pals.length===count,`[${name}] ${count} paladins expected, got ${pals.length}`);
     assert(attackers.length>=Math.min(count,5),`[${name}] only ${attackers.length}/${count} paladins reached castle contact`);
-    const minX=Math.min(...pals.map(u=>u.x));
-    const contact=await call('roundEndDiagnostics');
-    const expectedCenter=contact.centerFront+17+1.5;
-    assert(minX<=expectedCenter+5,`[${name}] paladin still too far from castle: minX=${minX.toFixed(1)} expected about ${expectedCenter.toFixed(1)}`);
-    assert(minX>=expectedCenter-2,`[${name}] paladin crossed castle collision: minX=${minX.toFixed(1)} safe=${expectedCenter.toFixed(1)}`);
-    console.log(`CASTLE CONTACT [${name}] count=${count} attackers=${attackers.length} minX=${minX.toFixed(1)} safeCenter=${expectedCenter.toFixed(1)} front=${contact.centerFront.toFixed(1)} scale=${contact.castleScale.toFixed(2)}`);
+    const checked=[];
+    for(const u of attackers){
+      const contact=await call('castleContactAt',u.y,17);
+      assert(Number.isFinite(contact.safeLeft),`[${name}] missing castle contour at y=${u.y}`);
+      assert(u.x>=contact.safeLeft-2,`[${name}] paladin crossed castle collision: x=${u.x.toFixed(1)} safe=${contact.safeLeft.toFixed(1)} y=${u.y.toFixed(1)}`);
+      assert(u.x<=contact.safeLeft+6,`[${name}] paladin too far from castle: x=${u.x.toFixed(1)} safe=${contact.safeLeft.toFixed(1)} y=${u.y.toFixed(1)}`);
+      checked.push({x:u.x,y:u.y,safe:contact.safeLeft,front:contact.front,scale:contact.scale});
+    }
+    const c=checked[0];
+    console.log(`CASTLE CONTACT [${name}] count=${count} attackers=${attackers.length} x=${c.x.toFixed(1)} safe=${c.safe.toFixed(1)} front=${c.front.toFixed(1)} scale=${c.scale.toFixed(2)}`);
   }
 
   // Result overlay + fade/despawn. Spawn enough units to prove nothing can cover the card.
