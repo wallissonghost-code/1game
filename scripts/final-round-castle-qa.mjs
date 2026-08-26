@@ -5,6 +5,7 @@ const PORT=4177, BASE=`http://127.0.0.1:${PORT}`;
 const server=spawnProcess('python3',['-m','http.server',String(PORT),'--bind','127.0.0.1'],{stdio:['ignore','pipe','pipe']});
 const sleep=ms=>new Promise(r=>setTimeout(r,ms));
 const assert=(ok,msg)=>{if(!ok)throw Error(msg)};
+const minDistance=arr=>{let best=Infinity;for(let i=0;i<arr.length;i++)for(let j=i+1;j<arr.length;j++)best=Math.min(best,Math.hypot(arr[i].x-arr[j].x,arr[i].y-arr[j].y));return best};
 
 async function waitServer(){for(let i=0;i<40;i++){try{const r=await fetch(`${BASE}/game.html`,{cache:'no-store'});if(r.ok)return}catch{}await sleep(250)}throw Error('QA server did not start')}
 
@@ -26,18 +27,22 @@ async function run(browser,name,viewport){
     await call('reset');
     await call('setCastleHpForTest','red',100000); // QA-only: real reset HP remains 100.
     for(let i=0;i<count;i++)await call('paladin');
-    const required=count===12?10:count;
-    const deadline=Date.now()+Math.max(24000,Math.ceil(viewport.width*40));
-    let s,attackers=[];
+    const requiredFront=count===1?1:(count===5?3:4);
+    const deadline=Date.now()+Math.max(26000,Math.ceil(viewport.width*42));
+    let s,attackers=[],pals=[];
     do{
       await sleep(250);
       s=await snap();
-      attackers=s.units.filter(u=>u.kind==='paladin'&&u.attackingCastle);
-      if(attackers.length>=required)break;
+      pals=s.units.filter(u=>u.kind==='paladin');
+      attackers=pals.filter(u=>u.attackingCastle);
+      const approach=pals.filter(u=>u.x<150);
+      if(attackers.length>=requiredFront&&approach.length===count)break;
     }while(Date.now()<deadline);
-    const pals=s.units.filter(u=>u.kind==='paladin');
     assert(pals.length===count,`[${name}] ${count} paladins expected, got ${pals.length}`);
-    assert(attackers.length>=required,`[${name}] only ${attackers.length}/${count} paladins reached castle contact; required ${required}`);
+    assert(attackers.length>=requiredFront,`[${name}] only ${attackers.length}/${count} paladins formed the attack line; required ${requiredFront}`);
+    const approach=pals.filter(u=>u.x<150);
+    assert(approach.length===count,`[${name}] collective assault not assembled near castle: ${approach.length}/${count}`);
+    if(count>1){const d=minDistance(pals);assert(d>=30,`[${name}] collective castle assault overlapped units: ${d.toFixed(1)}px`)}
     const checked=[];
     for(const u of attackers){
       const contact=await call('castleContactAt',u.y,17);
@@ -46,7 +51,7 @@ async function run(browser,name,viewport){
       checked.push({x:u.x,y:u.y,safe:contact.safeLeft,front:contact.front,scale:contact.scale});
     }
     const c=checked[0];
-    console.log(`CASTLE CONTACT [${name}] count=${count} attackers=${attackers.length} required=${required} x=${c.x.toFixed(1)} safe=${c.safe.toFixed(1)} front=${c.front.toFixed(1)} scale=${c.scale.toFixed(2)}`);
+    console.log(`CASTLE GROUP [${name}] count=${count} frontAttackers=${attackers.length} assembled=${approach.length}/${count} x=${c.x.toFixed(1)} safe=${c.safe.toFixed(1)} front=${c.front.toFixed(1)} scale=${c.scale.toFixed(2)}`);
   }
 
   // Real 100 HP again: destroy castle, open result, fade and remove every unit.
