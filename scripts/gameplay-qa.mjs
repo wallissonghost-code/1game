@@ -28,7 +28,6 @@ async function runScenario(browser,name,viewport){
   assert(assets.red>0&&assets.blue>0,`[${name}] castle asset failed to load`);
   assert(assets.bg&&assets.bg!=='none',`[${name}] battlefield map missing`);
 
-  // Formation sanity: specials must not stack into one another.
   await call('reset');for(let i=0;i<8;i++)await call('paladin');await sleep(1400);
   let p=await snap();const pals=p.units.filter(u=>u.kind==='paladin');
   assert(pals.length===8,`[${name}] expected 8 paladins, got ${pals.length}`);
@@ -38,13 +37,11 @@ async function runScenario(browser,name,viewport){
   const bw=viewport.width;
   assert(pals.every(u=>u.x>=86&&u.x<=bw-86),`[${name}] CASTLE BODY OVERLAP: special unit entered player/castle body`);
 
-  // Direction stability: blue special with no enemy must march left toward the red castle.
   const history=[];for(let i=0;i<18;i++){const s=await snap();history.push(s.units.find(u=>u.kind==='paladin')?.dir8);await sleep(110)}
   const clean=history.filter(Boolean),changes=clean.slice(1).reduce((n,v,i)=>n+(v!==clean[i]?1:0),0);
   assert(changes<=2,`[${name}] PALADIN DIRECTION FLICKER: ${changes} direction changes in ~2s (${clean.join(',')})`);
   assert(clean.slice(-8).every(v=>v==='w'),`[${name}] PALADIN WRONG MARCH FACING: expected w/left, got ${clean.join(',')}`);
 
-  // Castle contact: one blue paladin must reach the red wall, face left and actually damage it.
   await call('reset');await call('paladin');await sleep(7200);
   const contact=await snap();const solo=contact.units.find(u=>u.kind==='paladin');
   assert(solo,`[${name}] solo paladin disappeared before castle contact`);
@@ -53,19 +50,16 @@ async function runScenario(browser,name,viewport){
   assert(solo.x<=112,`[${name}] CASTLE ATTACK TOO FAR: paladin center x=${solo.x.toFixed(1)} should be close to wall`);
   assert(contact.redHp<100,`[${name}] CASTLE CONTACT FAILED: paladin reached wall but did not damage red castle`);
 
-  // Mixed armies: both sides must stay alive, finite and inside a sane world envelope.
   await call('reset');await call('spawn','red',40);await call('spawn','blue',40);for(let i=0;i<4;i++)await call('paladin');await sleep(2500);
   let mixed=await snap();
   assert(mixed.red>0&&mixed.blue>0,`[${name}] one army vanished immediately: red=${mixed.red} blue=${mixed.blue}`);
   assert(mixed.units.every(u=>Number.isFinite(u.x)&&Number.isFinite(u.y)&&u.x>-180&&u.x<viewport.width+180&&u.y>-120&&u.y<viewport.height+120),`[${name}] unit escaped battlefield / invalid coordinates`);
   assert(errors.length===0,`[${name}] runtime errors during mixed battle: ${errors.join(' | ')}`);
 
-  // Round logic: time finish must end the battle and automatic next round must recover.
   await call('reset');await call('damageCastle','red',80);await call('damageCastle','blue',10);await call('finishTime');await sleep(250);
   const ended=await snap();assert(ended.ended===true,`[${name}] time tiebreak did not end round`);
   await sleep(5600);const restarted=await snap();assert(restarted.ended===false&&restarted.redHp===100&&restarted.blueHp===100,`[${name}] automatic next round failed`);
 
-  // Stress similar to Caos Live: loop must keep advancing under a large army.
   await call('reset');await call('spawn','red',80);await call('spawn','blue',80);await sleep(5500);
   const stress=await snap();
   assert(stress.red+stress.blue>20,`[${name}] stress battle unexpectedly lost nearly all units`);
@@ -85,4 +79,4 @@ try{
   console.log('1GAME GAMEPLAY QA: ALL SCENARIOS PASSED');
 }finally{if(browser)await browser.close();server.kill('SIGTERM')}
 
-// QA trigger: castle-contact/paladin-facing v3
+// QA trigger: castle-contact/paladin-facing v4
