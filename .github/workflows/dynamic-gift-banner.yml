@@ -1,4 +1,4 @@
-name: Dynamic gift banner
+name: Improve gift HUD
 on:
   push:
     paths:
@@ -10,37 +10,29 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
-      - name: Make gift cards follow panel rules
+      - name: Improve gift proportions and comment actions
         run: |
           python3 - <<'PY'
           from pathlib import Path
           p=Path('game.html')
           s=p.read_text()
-          css='''\n<style id="dynamic-gift-style">\n.rule.sync-empty{opacity:.48}.rule.sync-empty .giftimg{filter:grayscale(1);opacity:.45}.rule.sync-empty .action:after{content:" · SEM REGRA";font-size:.62em;color:#667085}.rule .gift-name{display:block;margin-top:1px;max-width:76px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;font-size:6px;font-weight:800;color:#758196}.rule.sync-live{box-shadow:inset 0 1px 0 #ffffff0b,0 0 0 1px #ffffff05}\n</style>\n'''
-          if 'id="dynamic-gift-style"' not in s:s=s.replace('</head>',css+'</head>',1)
-          marker="function hitCastle(team,d){"
-          helper="""const RULE_CARD_ACTIONS={red:['spawn_red_1','spawn_red_3','spawn_red_10','spawn_red_40'],blue:['spawn_blue_1','spawn_blue_3','spawn_blue_10','spawn_blue_40']};function applyRuleVisualSync(rules=[]){const byAction=new Map((Array.isArray(rules)?rules:[]).map(r=>[String(r.actionId||''),r]));for(const team of ['red','blue']){const cards=[...document.querySelectorAll('.side.'+team+' .rule')];RULE_CARD_ACTIONS[team].forEach((actionId,i)=>{const card=cards[i];if(!card)return;const rule=byAction.get(actionId),img=card.querySelector('.giftimg'),action=card.querySelector('.action');card.classList.toggle('sync-empty',!rule);card.classList.toggle('sync-live',!!rule);if(rule){if(img&&rule.giftIcon)img.src=rule.giftIcon;if(img)img.alt=rule.giftName||'Presente configurado';if(action){let n=action.querySelector('.gift-name');if(!n){n=document.createElement('small');n.className='gift-name';action.appendChild(n)}n.textContent=rule.trigger==='chat'?(rule.commentText||'Comentário'):(rule.giftName||'Presente')}}else if(action){const n=action.querySelector('.gift-name');if(n)n.remove()}})}}"""
-          if 'function applyRuleVisualSync' not in s:
-            if marker not in s: raise SystemExit('helper anchor miss')
-            s=s.replace(marker,helper+marker,1)
-          old="else command(d)"
-          new="else if(d?.type==='rules_sync'){applyRuleVisualSync(d.rules||[])}else command(d)"
-          if old in s:
-            s=s.replace(old,new,1)
-          elif "d?.type==='rules_sync'" not in s:
-            raise SystemExit('data handler anchor miss')
+          css='''\n<style id="gift-hud-v2">\n/* Gift HUD v2: use the available portrait space instead of tiny icons */\n.livebar{padding:9px 10px max(11px,env(safe-area-inset-bottom));justify-content:flex-start}.live-title{margin:0 0 8px}.side{padding:8px}.side-head{font-size:9px;margin-bottom:7px}.rules{gap:7px}.rule{min-width:0;height:58px;padding:5px 7px;gap:7px}.giftimg{flex:0 0 43px;width:43px;height:43px;object-fit:contain;filter:drop-shadow(0 5px 8px #000a)}.action{min-width:0;font-size:10px;line-height:1.05}.rule .gift-name{margin-top:4px!important;max-width:82px!important;font-size:6.5px!important;line-height:1.05;color:#8d99aa!important}.team-comment{min-height:46px;margin-top:8px;padding:6px 8px;display:grid;grid-template-columns:auto 1fr;grid-template-rows:auto auto;column-gap:7px;row-gap:2px}.team-comment .comment-kicker{grid-column:1;grid-row:1 / span 2;align-self:center}.team-comment .comment-word{grid-column:2;grid-row:1;padding:0!important;border:0!important;background:none!important;font-size:9px;text-align:right}.team-comment .comment-action{grid-column:2;grid-row:2;text-align:right;font-size:7px;font-weight:950;letter-spacing:.06em;color:#fff;white-space:nowrap}.side.red .comment-action{color:#ffbdc4}.side.blue .comment-action{color:#c4d9ff}.rule.sync-empty{opacity:.34}.rule.sync-empty .giftimg{filter:grayscale(1);opacity:.35}\n@media(max-width:430px) and (orientation:portrait){.game{grid-template-rows:auto minmax(0,1fr) minmax(246px,32vh)}.livebar{padding-left:9px;padding-right:9px}.sides{gap:8px}.rule{height:60px}.giftimg{flex-basis:45px;width:45px;height:45px}.action{font-size:9.5px}.team-comment{min-height:47px}}\n@media(max-width:375px) and (orientation:portrait){.game{grid-template-rows:auto minmax(0,1fr) minmax(238px,33vh)}.side{padding:6px}.rules{gap:5px}.rule{height:56px;padding:4px 5px;gap:4px}.giftimg{flex-basis:40px;width:40px;height:40px}.action{font-size:8.5px}.rule .gift-name{max-width:68px!important;font-size:5.8px!important}}\n</style>\n'''
+          if 'id="gift-hud-v2"' not in s:s=s.replace('</head>',css+'</head>',1)
+          # Make both comment cards structurally identical and show their actual game action.
+          old="const mk=(team,label,color)=>{const el=document.createElement('div');el.className='team-comment';el.innerHTML='<span class=\"comment-kicker\">💬 COMENTE</span><b class=\"comment-word\">'+color+' '+label+'</b>';return el};sides[0].appendChild(mk('red','VERMELHO','🔴'));sides[1].appendChild(mk('blue','AZUL','🔵'))"
+          new="const mk=(team,label,color)=>{const el=document.createElement('div');el.className='team-comment';el.innerHTML='<span class=\"comment-kicker\">💬 COMENTE</span><b class=\"comment-word\">'+color+' '+label+'</b><small class=\"comment-action\">+1 MOB</small>';return el};sides[0].appendChild(mk('red','VERMELHO','🔴'));sides[1].appendChild(mk('blue','AZUL','🔵'))"
+          if old in s:s=s.replace(old,new,1)
+          elif 'class=\"comment-action\"' not in s:raise SystemExit('comment anchor miss')
           p.write_text(s)
-          print('Dynamic gift banner applied')
           PY
-      - name: Sanity checks
+      - name: Check
         run: |
-          grep -q "applyRuleVisualSync" game.html
-          grep -q "rules_sync" game.html
-          grep -q "RULE_CARD_ACTIONS" game.html
+          grep -q 'gift-hud-v2' game.html
+          grep -q 'comment-action' game.html
       - name: Commit
         run: |
           git config user.name ghostzinho
           git config user.email wallissonghost@gmail.com
           git add game.html
-          git commit -m "integration: sincronizar banners de presentes com o painel"
+          git commit -m "ui: melhorar proporção dos presentes e ações do chat"
           git push
