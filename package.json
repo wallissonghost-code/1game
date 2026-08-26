@@ -3,7 +3,8 @@
   "private": true,
   "type": "module",
   "scripts": {
-    "check:gameplay": "node scripts/gameplay-qa.mjs"
+    "check:gameplay": "node scripts/gameplay-qa.mjs",
+    "check:release": "node scripts/release-gate.mjs"
   },
   "devDependencies": {
     "playwright": "^1.55.0"
