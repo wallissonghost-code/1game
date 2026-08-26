@@ -50,21 +50,26 @@ s=s.replace(old,new,1)
 
 # Expose only diagnostics needed by final QA.
 needle="finishTime(){finishByTime();return true},\n  pause(value=true){paused=!!value;return paused}"
-repl="finishTime(){finishByTime();return true},\n  roundEndDiagnostics(){const overlay=$('victoryOverlay'),unitEls=[...battle.querySelectorAll('.unit')];return{ended,unitCount:unitEls.length,unitOpacity:unitEls.map(el=>getComputedStyle(el).opacity),overlayShown:!!overlay?.classList.contains('show'),overlayZ:Number(getComputedStyle(overlay).zIndex||0),castleScale:castleContactScale(),centerFront:castleFrontAtY(battle.clientHeight*.48),paladinStopRadius:3.5}},\n  pause(value=true){paused=!!value;return paused}"
+repl="finishTime(){finishByTime();return true},\n  castleContactAt(y,radius=17){const front=castleFrontAtY(Number(y));const r=Number(radius)||17;return{front,safeLeft:front==null?null:front+r+1.5,safeRight:front==null?null:battle.clientWidth-front-r-1.5,scale:castleContactScale()}},\n  roundEndDiagnostics(){const overlay=$('victoryOverlay'),unitEls=[...battle.querySelectorAll('.unit')];return{ended,unitCount:unitEls.length,unitOpacity:unitEls.map(el=>getComputedStyle(el).opacity),overlayShown:!!overlay?.classList.contains('show'),overlayZ:Number(getComputedStyle(overlay).zIndex||0),castleScale:castleContactScale(),centerFront:castleFrontAtY(battle.clientHeight*.48),paladinStopRadius:3.5}},\n  pause(value=true){paused=!!value;return paused}"
 if needle not in s:
     raise SystemExit('OneGameTest diagnostics anchor not found')
 s=s.replace(needle,repl,1)
 
 p.write_text(s,encoding='utf-8')
 
-# The old gameplay QA had a hard-coded x>=86 castle boundary. The castle contact
-# was intentionally moved closer, so validate against the new computed safe boundary.
+# The old gameplay QA had a hard-coded castle boundary. The contact contour varies
+# with Y, so compare the Paladin against the exact safe boundary at its own height.
 qa=Path('scripts/gameplay-qa.mjs')
 q=qa.read_text(encoding='utf-8')
 old_q="  assert(solo.x>=86,`[${name}] CASTLE OVERLAP: paladin center x=${solo.x.toFixed(1)} entered castle body`);\n  assert(solo.x<=112,`[${name}] CASTLE ATTACK TOO FAR: paladin center x=${solo.x.toFixed(1)} should be close to wall after ${travelTimeout}ms`);"
-new_q="  const castleDiag=await call('roundEndDiagnostics'),safeCastleX=castleDiag.centerFront+17+1.5;\n  assert(solo.x>=safeCastleX-2,`[${name}] CASTLE OVERLAP: paladin center x=${solo.x.toFixed(1)} safe=${safeCastleX.toFixed(1)}`);\n  assert(solo.x<=safeCastleX+6,`[${name}] CASTLE ATTACK TOO FAR: paladin center x=${solo.x.toFixed(1)} safe=${safeCastleX.toFixed(1)} after ${travelTimeout}ms`);"
-if old_q not in q:
-    raise SystemExit('legacy castle QA bounds not found')
-qa.write_text(q.replace(old_q,new_q,1),encoding='utf-8')
+old_q2="  const castleDiag=await call('roundEndDiagnostics'),safeCastleX=castleDiag.centerFront+17+1.5;\n  assert(solo.x>=safeCastleX-2,`[${name}] CASTLE OVERLAP: paladin center x=${solo.x.toFixed(1)} safe=${safeCastleX.toFixed(1)}`);\n  assert(solo.x<=safeCastleX+6,`[${name}] CASTLE ATTACK TOO FAR: paladin center x=${solo.x.toFixed(1)} safe=${safeCastleX.toFixed(1)} after ${travelTimeout}ms`);"
+new_q="  const castleDiag=await call('castleContactAt',solo.y,17),safeCastleX=castleDiag.safeLeft;\n  assert(Number.isFinite(safeCastleX),`[${name}] castle contour missing at paladin y=${solo.y.toFixed(1)}`);\n  assert(solo.x>=safeCastleX-2,`[${name}] CASTLE OVERLAP: paladin center x=${solo.x.toFixed(1)} safe=${safeCastleX.toFixed(1)}`);\n  assert(solo.x<=safeCastleX+6,`[${name}] CASTLE ATTACK TOO FAR: paladin center x=${solo.x.toFixed(1)} safe=${safeCastleX.toFixed(1)} after ${travelTimeout}ms`);"
+if old_q in q:
+    q=q.replace(old_q,new_q,1)
+elif old_q2 in q:
+    q=q.replace(old_q2,new_q,1)
+else:
+    raise SystemExit('castle QA bounds not found')
+qa.write_text(q,encoding='utf-8')
 
 print('patched final round cleanup + close castle contact: stopRadius=3.5, fade=400ms, remove=420ms')
