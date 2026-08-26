@@ -29,7 +29,6 @@ async function runScenario(browser,name,viewport){
   assert(assets.red>0&&assets.blue>0,`[${name}] castle asset failed to load`);
   assert(assets.bg&&assets.bg!=='none',`[${name}] battlefield map missing`);
 
-  // Cardinal normalization contract: no fake diagonal sprite/state exists.
   const norm=async d=>call('normalizeDir',d,'w');
   assert(await norm('w')==='w','w must stay w');
   assert(await norm('e')==='e','e must stay e');
@@ -40,7 +39,6 @@ async function runScenario(browser,name,viewport){
   assert(await norm('ne')==='e','ne must normalize to e');
   assert(await norm('se')==='e','se must normalize to e');
 
-  // Several Paladins marching together: stable left-facing state and no overlap.
   await call('reset');for(let i=0;i<8;i++)await call('paladin');await sleep(1400);
   let p=await snap();const pals=p.units.filter(u=>u.kind==='paladin');
   assert(pals.length===8,`[${name}] expected 8 paladins, got ${pals.length}`);
@@ -56,17 +54,16 @@ async function runScenario(browser,name,viewport){
   assert(changes<=2,`[${name}] PALADIN DIRECTION FLICKER: ${changes} changes in ~2s (${clean.join(',')})`);
   assert(clean.slice(-8).every(v=>v==='w/w/w'),`[${name}] PALADIN WRONG MARCH FACING: expected w/w/w, got ${clean.join(',')}`);
 
-  // Solo march + castle approach. Poll for actual contact so desktop width is not falsely timed out.
+  // Solo march + castle approach. Timeout scales with arena width; gameplay speed is untouched.
   await call('reset');await call('paladin');
-  let contact,solo;const deadline=Date.now()+20000;
+  let contact,solo;const travelTimeout=Math.max(20000,Math.ceil(viewport.width*36));const deadline=Date.now()+travelTimeout;
   do{await sleep(250);contact=await snap();solo=contact.units.find(u=>u.kind==='paladin');if(contact.redHp<100)break}while(Date.now()<deadline);
   assert(solo,`[${name}] solo paladin disappeared before castle contact`);
   assert(solo.dir8==='w'&&solo.faceDir==='w'&&solo.palDir==='w',`[${name}] solo paladin reached objective with divergent facing ${solo.dir8}/${solo.faceDir}/${solo.palDir}`);
   assert(solo.x>=86,`[${name}] CASTLE OVERLAP: paladin center x=${solo.x.toFixed(1)} entered castle body`);
-  assert(solo.x<=112,`[${name}] CASTLE ATTACK TOO FAR: paladin center x=${solo.x.toFixed(1)} should be close to wall`);
-  assert(contact.redHp<100,`[${name}] CASTLE CONTACT FAILED: paladin did not damage red castle before timeout`);
+  assert(solo.x<=112,`[${name}] CASTLE ATTACK TOO FAR: paladin center x=${solo.x.toFixed(1)} should be close to wall after ${travelTimeout}ms`);
+  assert(contact.redHp<100,`[${name}] CASTLE CONTACT FAILED: paladin did not damage red castle before ${travelTimeout}ms`);
 
-  // Enemy combat: all exposed Paladin direction fields must remain cardinal during target changes/attacks.
   await call('reset');await call('spawn','red',40);await call('spawn','blue',40);for(let i=0;i<4;i++)await call('paladin');await sleep(2500);
   let mixed=await snap();
   assert(mixed.red>0&&mixed.blue>0,`[${name}] one army vanished immediately: red=${mixed.red} blue=${mixed.blue}`);
@@ -85,7 +82,7 @@ async function runScenario(browser,name,viewport){
   assert(stress.fps>=15,`[${name}] stress FPS collapsed: ${stress.fps}`);
   assert(errors.length===0,`[${name}] runtime errors under stress: ${errors.join(' | ')}`);
 
-  console.log(`1GAME QA OK [${name}] fps=${stress.fps} mobs=${stress.red+stress.blue} paladinMin=${palMin.toFixed(1)}px dirChanges=${changes} contactX=${solo.x.toFixed(1)}`);
+  console.log(`1GAME QA OK [${name}] fps=${stress.fps} mobs=${stress.red+stress.blue} paladinMin=${palMin.toFixed(1)}px dirChanges=${changes} contactX=${solo.x.toFixed(1)} travelTimeout=${travelTimeout}`);
   await context.close();
 }
 
@@ -98,4 +95,4 @@ try{
   console.log('1GAME GAMEPLAY QA: ALL SCENARIOS PASSED');
 }finally{if(browser)await browser.close();server.kill('SIGTERM')}
 
-// QA trigger: cardinal-paladin-state v5
+// QA trigger: cardinal-paladin-state v6
