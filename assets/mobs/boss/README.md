@@ -1,6 +1,6 @@
 # Bosses
 
-Estrutura separada por reino.
+Pastas reservadas. Ainda não existem skins de Boss ou Paladino no projeto.
 
-- `red/` — bosses e especiais do time Vermelho.
-- `blue/` — bosses e especiais do time Azul.
+- `red/` — futuros bosses/especiais Vermelhos.
+- `blue/` — futuros bosses/especiais Azuis.

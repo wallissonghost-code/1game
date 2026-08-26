@@ -1,10 +1,10 @@
 # Mobs
 
-Organização sugerida por tipo:
-- `warrior/`
-- `archer/`
-- `mage/`
-- `knight/`
-- `boss/`
+Estrutura atual:
 
-Cada tipo pode ter skins `chaos-*` e `light-*`. Para sprites animados, manter o mesmo tamanho de frame e origem.
+- `red/` — todos os frames do Cavaleiro/Mob Vermelho.
+- `blue/` — todos os frames do Cavaleiro/Mob Azul.
+- `boss/red/` — reservado para futuros bosses/especiais Vermelhos.
+- `boss/blue/` — reservado para futuros bosses/especiais Azuis.
+
+Paladinos ainda não foram adicionados ao projeto.
