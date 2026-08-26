@@ -1,0 +1,63 @@
+name: Organize boss assets
+on:
+  push:
+    paths:
+      - '.github/workflows/organize-boss-assets.yml'
+permissions:
+  contents: write
+jobs:
+  organize:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Organize blue paladin and boss folders
+        run: |
+          set -e
+          mkdir -p "assets/mobs/boss/red"
+          mkdir -p "assets/mobs/boss/blue/paladin"
+
+          # O conjunto "frame_XXX 3.png" foi o grupo novo deixado solto em assets/.
+          # Mantemos os nomes originais para não perder a ordem dos frames.
+          shopt -s nullglob
+          files=(assets/frame_*\ 3.png)
+          if [ ${#files[@]} -gt 0 ]; then
+            git mv "${files[@]}" "assets/mobs/boss/blue/paladin/"
+          fi
+
+          cat > assets/mobs/boss/README.md <<'EOF'
+          # Bosses
+
+          Estrutura separada por reino.
+
+          - `red/` — bosses e especiais do time Vermelho.
+          - `blue/` — bosses e especiais do time Azul.
+          EOF
+
+          cat > assets/mobs/boss/red/README.md <<'EOF'
+          # Boss Vermelho
+
+          Coloque aqui frames, sprites e variações dos bosses do time Vermelho.
+          Para animações, mantenha a sequência `frame_001.png`, `frame_002.png`, etc.
+          EOF
+
+          cat > assets/mobs/boss/blue/README.md <<'EOF'
+          # Boss Azul
+
+          Coloque aqui frames, sprites e variações dos bosses do time Azul.
+          O Paladino Azul fica separado em `paladin/`.
+          EOF
+
+          cat > assets/mobs/boss/blue/paladin/README.md <<'EOF'
+          # Paladino Azul
+
+          Frames do Paladino/Rei Paladino do Reino da Luz.
+          Esta pasta é exclusiva dele para não misturar com cavaleiros comuns ou outros bosses.
+          EOF
+
+      - name: Commit organization
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add assets/mobs/boss assets
+          git diff --cached --quiet || git commit -m "assets: separar paladino azul e bosses por reino"
+          git push
