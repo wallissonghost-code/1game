@@ -35,6 +35,8 @@ async function runScenario(browser,name,viewport){
   assert(pals.every(u=>Number.isFinite(u.x)&&Number.isFinite(u.y)),`[${name}] paladin position became NaN/Infinity`);
   const palMin=minDistance(pals);
   assert(palMin>=30,`[${name}] PALADIN OVERLAP: minimum center distance ${palMin.toFixed(1)}px (expected >=30px)`);
+  const bw=viewport.width;
+  assert(pals.every(u=>u.x>=112&&u.x<=bw-112),`[${name}] CASTLE BODY OVERLAP: special unit entered player/castle body`);
 
   // Direction stability: moving toward one objective must not spin through directions every frame.
   const history=[];for(let i=0;i<18;i++){const s=await snap();history.push(s.units.find(u=>u.kind==='paladin')?.dir8);await sleep(110)}

@@ -1,5 +1,5 @@
 {
-  "version": 3,
+  "version": 4,
   "active": {
     "map": "battlefield-v1",
     "castles": {
@@ -29,14 +29,14 @@
     "chaos-red-v1": {
       "team": "red",
       "type": "image",
-      "src": "assets/castles/Vermelho.png",
+      "src": "assets/players/castles/red/castle.png",
       "anchor": "left-center",
       "attackRadius": 34
     },
     "light-blue-v1": {
       "team": "blue",
       "type": "image",
-      "src": "assets/castles/Azul.png",
+      "src": "assets/players/castles/blue/castle.png",
       "anchor": "right-center",
       "attackRadius": 34
     }
@@ -45,13 +45,26 @@
     "warrior-chaos-default": {
       "type": "warrior",
       "team": "red",
-      "src": null
+      "src": "assets/mobs/regular/red/",
+      "class": "regular"
     },
     "warrior-light-default": {
       "type": "warrior",
       "team": "blue",
-      "src": null
+      "src": "assets/mobs/regular/blue/",
+      "class": "regular"
+    },
+    "paladin-light-v1": {
+      "type": "paladin",
+      "class": "special",
+      "team": "blue",
+      "src": "assets/mobs/special/paladin/blue/",
+      "frames": 32
     }
   },
-  "effects": {}
+  "effects": {},
+  "bosses": {
+    "red": {},
+    "blue": {}
+  }
 }
