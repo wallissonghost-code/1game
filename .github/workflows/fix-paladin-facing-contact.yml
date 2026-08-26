@@ -8,20 +8,32 @@ on:
 permissions:
   contents: write
 jobs:
-  patch:
+  patch-test-commit:
     runs-on: ubuntu-latest
-    timeout-minutes: 5
+    timeout-minutes: 18
     steps:
       - uses: actions/checkout@v4
         with:
           ref: dev
+          fetch-depth: 0
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '24'
       - name: Apply focused gameplay fix
         run: python3 scripts/fix-paladin-facing-contact.py
-      - name: Commit patched game to dev
+      - name: Install QA dependencies
+        run: |
+          npm install --no-audit --no-fund
+          npx playwright install --with-deps chromium
+      - name: Critical release gate on patched tree
+        run: npm run check:release
+      - name: Gameplay QA on patched tree
+        run: npm run check:gameplay
+      - name: Commit only tested game to dev
         run: |
           git config user.name 'github-actions[bot]'
           git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
           git add game.html
-          git commit -m 'fix: marcha reta, facing correto e contato de castelo' || exit 0
+          git diff --cached --quiet && exit 0
+          git commit -m 'fix: marcha horizontal, facing e contato do castelo validados'
           git push origin HEAD:dev
-# trigger v2
