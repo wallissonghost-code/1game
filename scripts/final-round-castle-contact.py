@@ -56,4 +56,15 @@ if needle not in s:
 s=s.replace(needle,repl,1)
 
 p.write_text(s,encoding='utf-8')
+
+# The old gameplay QA had a hard-coded x>=86 castle boundary. The castle contact
+# was intentionally moved closer, so validate against the new computed safe boundary.
+qa=Path('scripts/gameplay-qa.mjs')
+q=qa.read_text(encoding='utf-8')
+old_q="  assert(solo.x>=86,`[${name}] CASTLE OVERLAP: paladin center x=${solo.x.toFixed(1)} entered castle body`);\n  assert(solo.x<=112,`[${name}] CASTLE ATTACK TOO FAR: paladin center x=${solo.x.toFixed(1)} should be close to wall after ${travelTimeout}ms`);"
+new_q="  const castleDiag=await call('roundEndDiagnostics'),safeCastleX=castleDiag.centerFront+17+1.5;\n  assert(solo.x>=safeCastleX-2,`[${name}] CASTLE OVERLAP: paladin center x=${solo.x.toFixed(1)} safe=${safeCastleX.toFixed(1)}`);\n  assert(solo.x<=safeCastleX+6,`[${name}] CASTLE ATTACK TOO FAR: paladin center x=${solo.x.toFixed(1)} safe=${safeCastleX.toFixed(1)} after ${travelTimeout}ms`);"
+if old_q not in q:
+    raise SystemExit('legacy castle QA bounds not found')
+qa.write_text(q.replace(old_q,new_q,1),encoding='utf-8')
+
 print('patched final round cleanup + close castle contact: stopRadius=3.5, fade=400ms, remove=420ms')
