@@ -8,6 +8,7 @@ const sleep=ms=>new Promise(r=>setTimeout(r,ms));
 async function waitServer(){for(let i=0;i<40;i++){try{const r=await fetch(`${BASE}/game.html`,{cache:'no-store'});if(r.ok)return}catch{}await sleep(250)}throw Error('QA server did not start')}
 const assert=(ok,msg)=>{if(!ok)throw Error(msg)};
 const minDistance=arr=>{let best=Infinity;for(let i=0;i<arr.length;i++)for(let j=i+1;j<arr.length;j++)best=Math.min(best,Math.hypot(arr[i].x-arr[j].x,arr[i].y-arr[j].y));return best};
+const CARDINAL=new Set(['w','e','n','s']);
 
 async function runScenario(browser,name,viewport){
   const context=await browser.newContext({viewport});
@@ -28,6 +29,18 @@ async function runScenario(browser,name,viewport){
   assert(assets.red>0&&assets.blue>0,`[${name}] castle asset failed to load`);
   assert(assets.bg&&assets.bg!=='none',`[${name}] battlefield map missing`);
 
+  // Cardinal normalization contract: no fake diagonal sprite/state exists.
+  const norm=async d=>call('normalizeDir',d,'w');
+  assert(await norm('w')==='w','w must stay w');
+  assert(await norm('e')==='e','e must stay e');
+  assert(await norm('n')==='n','n must stay n');
+  assert(await norm('s')==='s','s must stay s');
+  assert(await norm('nw')==='w','nw must normalize to w');
+  assert(await norm('sw')==='w','sw must normalize to w');
+  assert(await norm('ne')==='e','ne must normalize to e');
+  assert(await norm('se')==='e','se must normalize to e');
+
+  // Several Paladins marching together: stable left-facing state and no overlap.
   await call('reset');for(let i=0;i<8;i++)await call('paladin');await sleep(1400);
   let p=await snap();const pals=p.units.filter(u=>u.kind==='paladin');
   assert(pals.length===8,`[${name}] expected 8 paladins, got ${pals.length}`);
@@ -36,24 +49,30 @@ async function runScenario(browser,name,viewport){
   assert(palMin>=30,`[${name}] PALADIN OVERLAP: minimum center distance ${palMin.toFixed(1)}px (expected >=30px)`);
   const bw=viewport.width;
   assert(pals.every(u=>u.x>=86&&u.x<=bw-86),`[${name}] CASTLE BODY OVERLAP: special unit entered player/castle body`);
+  assert(pals.every(u=>u.dir8==='w'&&u.faceDir==='w'&&u.palDir==='w'),`[${name}] PALADIN STATE DIVERGED: ${JSON.stringify(pals.map(u=>({d:u.dir8,f:u.faceDir,p:u.palDir})))}`);
 
-  const history=[];for(let i=0;i<18;i++){const s=await snap();history.push(s.units.find(u=>u.kind==='paladin')?.dir8);await sleep(110)}
+  const history=[];for(let i=0;i<18;i++){const s=await snap();const u=s.units.find(u=>u.kind==='paladin');history.push(u?`${u.dir8}/${u.faceDir}/${u.palDir}`:null);await sleep(110)}
   const clean=history.filter(Boolean),changes=clean.slice(1).reduce((n,v,i)=>n+(v!==clean[i]?1:0),0);
-  assert(changes<=2,`[${name}] PALADIN DIRECTION FLICKER: ${changes} direction changes in ~2s (${clean.join(',')})`);
-  assert(clean.slice(-8).every(v=>v==='w'),`[${name}] PALADIN WRONG MARCH FACING: expected w/left, got ${clean.join(',')}`);
+  assert(changes<=2,`[${name}] PALADIN DIRECTION FLICKER: ${changes} changes in ~2s (${clean.join(',')})`);
+  assert(clean.slice(-8).every(v=>v==='w/w/w'),`[${name}] PALADIN WRONG MARCH FACING: expected w/w/w, got ${clean.join(',')}`);
 
-  await call('reset');await call('paladin');await sleep(7200);
-  const contact=await snap();const solo=contact.units.find(u=>u.kind==='paladin');
+  // Solo march + castle approach. Poll for actual contact so desktop width is not falsely timed out.
+  await call('reset');await call('paladin');
+  let contact,solo;const deadline=Date.now()+20000;
+  do{await sleep(250);contact=await snap();solo=contact.units.find(u=>u.kind==='paladin');if(contact.redHp<100)break}while(Date.now()<deadline);
   assert(solo,`[${name}] solo paladin disappeared before castle contact`);
-  assert(solo.dir8==='w',`[${name}] solo paladin reached objective facing ${solo.dir8}, expected w/left`);
+  assert(solo.dir8==='w'&&solo.faceDir==='w'&&solo.palDir==='w',`[${name}] solo paladin reached objective with divergent facing ${solo.dir8}/${solo.faceDir}/${solo.palDir}`);
   assert(solo.x>=86,`[${name}] CASTLE OVERLAP: paladin center x=${solo.x.toFixed(1)} entered castle body`);
   assert(solo.x<=112,`[${name}] CASTLE ATTACK TOO FAR: paladin center x=${solo.x.toFixed(1)} should be close to wall`);
-  assert(contact.redHp<100,`[${name}] CASTLE CONTACT FAILED: paladin reached wall but did not damage red castle`);
+  assert(contact.redHp<100,`[${name}] CASTLE CONTACT FAILED: paladin did not damage red castle before timeout`);
 
+  // Enemy combat: all exposed Paladin direction fields must remain cardinal during target changes/attacks.
   await call('reset');await call('spawn','red',40);await call('spawn','blue',40);for(let i=0;i<4;i++)await call('paladin');await sleep(2500);
   let mixed=await snap();
   assert(mixed.red>0&&mixed.blue>0,`[${name}] one army vanished immediately: red=${mixed.red} blue=${mixed.blue}`);
   assert(mixed.units.every(u=>Number.isFinite(u.x)&&Number.isFinite(u.y)&&u.x>-180&&u.x<viewport.width+180&&u.y>-120&&u.y<viewport.height+120),`[${name}] unit escaped battlefield / invalid coordinates`);
+  const mixedPals=mixed.units.filter(u=>u.kind==='paladin');
+  assert(mixedPals.every(u=>CARDINAL.has(u.dir8)&&CARDINAL.has(u.faceDir)&&CARDINAL.has(u.palDir)),`[${name}] diagonal state leaked during combat: ${JSON.stringify(mixedPals)}`);
   assert(errors.length===0,`[${name}] runtime errors during mixed battle: ${errors.join(' | ')}`);
 
   await call('reset');await call('damageCastle','red',80);await call('damageCastle','blue',10);await call('finishTime');await sleep(250);
@@ -79,4 +98,4 @@ try{
   console.log('1GAME GAMEPLAY QA: ALL SCENARIOS PASSED');
 }finally{if(browser)await browser.close();server.kill('SIGTERM')}
 
-// QA trigger: castle-contact/paladin-facing v4
+// QA trigger: cardinal-paladin-state v5
