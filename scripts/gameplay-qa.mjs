@@ -74,3 +74,5 @@ try{
   await runScenario(browser,'desktop',{width:1440,height:900});
   console.log('1GAME GAMEPLAY QA: ALL SCENARIOS PASSED');
 }finally{if(browser)await browser.close();server.kill('SIGTERM')}
+
+// QA trigger: castle-contact/paladin-facing v2
