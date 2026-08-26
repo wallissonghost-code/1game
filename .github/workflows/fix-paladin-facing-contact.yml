@@ -4,11 +4,12 @@ on:
     branches: [dev]
     paths:
       - '.github/workflows/fix-paladin-facing-contact.yml'
+      - 'scripts/fix-paladin-facing-contact.py'
   workflow_dispatch:
 permissions:
   contents: write
 jobs:
-  patch-test-commit:
+  patch-test-promote:
     runs-on: ubuntu-latest
     timeout-minutes: 18
     steps:
@@ -29,11 +30,14 @@ jobs:
         run: npm run check:release
       - name: Gameplay QA on patched tree
         run: npm run check:gameplay
-      - name: Commit only tested game to dev
+      - name: Commit exact tested game
         run: |
           git config user.name 'github-actions[bot]'
           git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
           git add game.html
-          git diff --cached --quiet && exit 0
-          git commit -m 'fix: marcha horizontal, facing e contato do castelo validados'
-          git push origin HEAD:dev
+          if ! git diff --cached --quiet; then
+            git commit -m 'fix: paladino 4 direções x 8 frames validado'
+            git push origin HEAD:dev
+          fi
+      - name: Promote exact tested tree to main
+        run: git push origin HEAD:main
