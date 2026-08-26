@@ -15,6 +15,10 @@ jobs:
       - uses: actions/setup-node@v4
         with:
           node-version: '24'
+      - name: Stamp approved build version
+        env:
+          GAME_BUILD_PATCH: ${{ github.run_number }}
+        run: python3 scripts/stamp-version.py
       - name: Install QA dependencies
         run: |
           npm install --no-audit --no-fund
@@ -23,7 +27,14 @@ jobs:
         run: npm run check:release
       - name: Gameplay QA
         run: npm run check:gameplay
-      - name: Promote exact tested commit to main
+      - name: Commit exact tested build to dev
         run: |
-          git fetch origin main
-          git push origin HEAD:main
+          git config user.name 'github-actions[bot]'
+          git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
+          git add game.html
+          if ! git diff --cached --quiet; then
+            git commit -m "build: BETA 0.2.${{ github.run_number }} aprovado pelo QA"
+            git push origin HEAD:dev
+          fi
+      - name: Promote exact tested build to main
+        run: git push origin HEAD:main
