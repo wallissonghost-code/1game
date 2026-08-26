@@ -1,0 +1,82 @@
+name: Fix castle contact and paladin facing v2
+on:
+  push:
+    paths:
+      - '.github/workflows/fix-castle-paladin-v2.yml'
+permissions:
+  contents: write
+jobs:
+  fix:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Patch castle collision and paladin animation
+        run: |
+          python3 - <<'PY'
+          from pathlib import Path
+          import re
+          p=Path('game.html')
+          s=p.read_text(encoding='utf-8')
+
+          # 32 frames are 8 directions x 4 consecutive animation frames in this asset pack.
+          s,n=re.subn(r"const PALADIN_DIRS=\{[^;]+\};/\* caos-combat-port-v1 \*/",
+            "const PALADIN_DIRS={s:[0,1,2,3],se:[4,5,6,7],e:[8,9,10,11],ne:[12,13,14,15],n:[16,17,18,19],nw:[20,21,22,23],w:[24,25,26,27],sw:[28,29,30,31]};/* caos-combat-port-v1 *//* castle-paladin-v2 */",
+            s,count=1)
+          if n!=1: raise SystemExit('PALADIN_DIRS current anchor not found')
+
+          # Castle silhouette: broad main wall + narrower tower section. Target is the actual visible edge,
+          # not a remote point in front of the castle.
+          old="function castlePoint(team){return team==='red'?{x:118,y:battle.clientHeight*.48}:{x:battle.clientWidth-118,y:battle.clientHeight*.48}}"
+          new="""function castleFrontAtY(y){const cy=battle.clientHeight*.48,dy=Math.abs(y-cy);if(dy<=54)return 96;if(dy<=78)return 80;return null}function castlePoint(team,u=null){const cy=battle.clientHeight*.48,y=clamp(u?.y??cy,cy-78,cy+78),front=castleFrontAtY(y)??80;return team==='red'?{x:front,y}:{x:battle.clientWidth-front,y}}"""
+          if old not in s: raise SystemExit('castlePoint current anchor not found')
+          s=s.replace(old,new,1)
+
+          pat=r"function resolveCastleBodies\(u\)\{\s*const r=unitRadius\(u\),cy=battle\.clientHeight\*\.48,halfH=82\+r;\s*if\(Math\.abs\(u\.y-cy\)>halfH\)return;\s*const left=100\+r,right=battle\.clientWidth-100-r;\s*if\(u\.x<left\)u\.x=left;\s*if\(u\.x>right\)u\.x=right;\s*\}"
+          repl="""function resolveCastleBodies(u){const r=unitRadius(u),front=castleFrontAtY(u.y);if(front==null)return;const left=front+r+1,right=battle.clientWidth-front-r-1;if(u.x<left)u.x=left;if(u.x>right)u.x=right;}"""
+          s,n=re.subn(pat,repl,s,count=1,flags=re.S)
+          if n!=1: raise SystemExit('resolveCastleBodies anchor not found')
+
+          # When a unit targets a castle, continuously target the nearest point on the castle wall.
+          s=s.replace("let target=u.target;if(!target||(!u.targetIsCastle&&target.hp<=0)){target=castlePoint(u.team==='red'?'blue':'red');u.target=target;u.targetIsCastle=true}const isCastle=!!u.targetIsCastle,rawTx=target.x,rawTy=target.y,dx=rawTx-u.x,dy=rawTy-u.y,d=Math.hypot(dx,dy)||.001,ur=unitRadius(u),tr=isCastle?0:unitRadius(target),stopRadius=isCastle?CASTLE_RANGE:(ur+tr+5);",
+                      "let target=u.target;if(!target||(!u.targetIsCastle&&target.hp<=0)){target=castlePoint(u.team==='red'?'blue':'red',u);u.target=target;u.targetIsCastle=true}const isCastle=!!u.targetIsCastle;if(isCastle){target=castlePoint(u.team==='red'?'blue':'red',u);u.target=target}const rawTx=target.x,rawTy=target.y,dx=rawTx-u.x,dy=rawTy-u.y,d=Math.hypot(dx,dy)||.001,ur=unitRadius(u),tr=isCastle?0:unitRadius(target),stopRadius=isCastle?(ur+4):(ur+tr+5);",1)
+
+          # Face the intended target, not the tiny separation correction vector.
+          s=s.replace("u.animDx=vx;u.animDy=vy}applyFreeSeparation(u);resolveCastleBodies(u);animateUnit(u,dt,moving,rawTx);",
+                      "u.animDx=rawTx-u.x;u.animDy=rawTy-u.y}applyFreeSeparation(u);resolveCastleBodies(u);animateUnit(u,dt,moving,rawTx);",1)
+
+          # Strong hysteresis: direction must remain requested for ~180ms before changing.
+          pat=r"function paladinDirection\(u,dx,dy\)\{.*?return u\.palDir\|\|d;\s*\}"
+          repl="""function paladinDirection(u,dx,dy,dt=.016){if(Math.abs(dx)<.35&&Math.abs(dy)<.35)return u.palDir||'w';const a=Math.atan2(dy,dx)*180/Math.PI;let d='e';if(a>=-22.5&&a<22.5)d='e';else if(a>=22.5&&a<67.5)d='se';else if(a>=67.5&&a<112.5)d='s';else if(a>=112.5&&a<157.5)d='sw';else if(a>=157.5||a<-157.5)d='w';else if(a>=-157.5&&a<-112.5)d='nw';else if(a>=-112.5&&a<-67.5)d='n';else d='ne';if(!u.palDir){u.palDir=d;u.palDirCandidate=d;u.palDirHold=0;return d}if(d===u.palDir){u.palDirCandidate=d;u.palDirHold=0;return u.palDir}if(d!==u.palDirCandidate){u.palDirCandidate=d;u.palDirHold=0;return u.palDir}u.palDirHold=(u.palDirHold||0)+dt;if(u.palDirHold>=.18){u.palDir=d;u.palDirHold=0;u.frame=0}return u.palDir}"""
+          s,n=re.subn(pat,repl,s,count=1,flags=re.S)
+          if n!=1: raise SystemExit('paladinDirection anchor not found')
+
+          s=s.replace("dirName=paladinDirection(u,dx,dy),group=PALADIN_DIRS[dirName]",
+                      "dirName=paladinDirection(u,dx,dy,dt),group=PALADIN_DIRS[dirName]",1)
+
+          # Keep the special unit fast/strong, but slightly reduce visual frame cadence so movement reads cleanly.
+          s=s.replace("u.anim+=dt;const interval=.085;","u.anim+=dt;const interval=.115;",1)
+          s=s.replace("version:'0.5'","version:'0.6'",1)
+          p.write_text(s,encoding='utf-8')
+
+          # Fix QA bug: dir8 is a string, so Number.isFinite was silently disabling the spin test.
+          q=Path('scripts/gameplay-qa.mjs')
+          if q.exists():
+            t=q.read_text(encoding='utf-8')
+            t=t.replace("const clean=history.filter(Number.isFinite),changes=clean.slice(1).reduce((n,v,i)=>n+(v!==clean[i]?1:0),0);","const clean=history.filter(Boolean),changes=clean.slice(1).reduce((n,v,i)=>n+(v!==clean[i]?1:0),0);")
+            t=t.replace("assert(changes<=5,`[${name}] PALADIN DIRECTION FLICKER:","assert(changes<=2,`[${name}] PALADIN DIRECTION FLICKER:")
+            q.write_text(t,encoding='utf-8')
+          PY
+      - name: Validate patch anchors
+        run: |
+          grep -q 'castle-paladin-v2' game.html
+          grep -q 'stopRadius=isCastle?(ur+4)' game.html
+          grep -q 'palDirHold>=.18' game.html
+          grep -q 's:\[0,1,2,3\]' game.html
+          grep -q 'history.filter(Boolean)' scripts/gameplay-qa.mjs
+      - name: Commit fix
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add game.html scripts/gameplay-qa.mjs
+          git diff --cached --quiet || git commit -m "fix: contato real com castelo e direção estável do paladino"
+          git push
