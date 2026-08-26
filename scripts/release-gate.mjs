@@ -14,6 +14,22 @@ const peerStub=`(()=>{
 
 async function waitServer(){for(let i=0;i<50;i++){try{const r=await fetch(BASE+'/index.html');if(r.ok)return}catch{}await sleep(200)}throw new Error('release gate server did not start')}
 
+async function waitCurrentUnitSkins(page){
+ await page.waitForFunction(()=>{
+   const red=[...document.querySelectorAll('.unit.red:not(.paladin) .mob-sprite')];
+   const blue=[...document.querySelectorAll('.unit.blue:not(.paladin) .mob-sprite')];
+   const pal=[...document.querySelectorAll('.unit.paladin .mob-sprite')];
+   const ok=a=>a.length>0&&a.every(i=>i.complete&&i.naturalWidth>0&&i.naturalHeight>0);
+   return red.length>=2&&blue.length>=2&&pal.length>=1&&ok(red)&&ok(blue)&&ok(pal);
+ },null,{timeout:5000});
+ // Two samples avoid accepting the instant between animated src swaps.
+ await page.waitForTimeout(140);
+ await page.waitForFunction(()=>{
+   const all=[...document.querySelectorAll('.unit .mob-sprite')];
+   return all.length>=5&&all.every(i=>i.complete&&i.naturalWidth>0&&i.naturalHeight>0);
+ },null,{timeout:3000});
+}
+
 async function test(browser,name,viewport){
  const context=await browser.newContext({viewport});
  const page=await context.newPage();
@@ -53,15 +69,15 @@ async function test(browser,name,viewport){
  const call=(method,...args)=>page.evaluate(({method,args})=>window.OneGameTest[method](...args),{method,args});
  await call('reset');
  await call('spawn','red',2);await call('spawn','blue',2);await call('paladin');
- await page.waitForTimeout(600);
+ await waitCurrentUnitSkins(page);
  const skins=await page.evaluate(()=>({
-   red:[...document.querySelectorAll('.unit.red:not(.paladin) .mob-sprite')].map(i=>i.naturalWidth),
-   blue:[...document.querySelectorAll('.unit.blue:not(.paladin) .mob-sprite')].map(i=>i.naturalWidth),
-   pal:[...document.querySelectorAll('.unit.paladin .mob-sprite')].map(i=>i.naturalWidth)
+   red:[...document.querySelectorAll('.unit.red:not(.paladin) .mob-sprite')].map(i=>({w:i.naturalWidth,src:i.getAttribute('src')})),
+   blue:[...document.querySelectorAll('.unit.blue:not(.paladin) .mob-sprite')].map(i=>({w:i.naturalWidth,src:i.getAttribute('src')})),
+   pal:[...document.querySelectorAll('.unit.paladin .mob-sprite')].map(i=>({w:i.naturalWidth,src:i.getAttribute('src')}))
  }));
- assert(skins.red.length>=2&&skins.red.every(Boolean),`[${name}] red mob skin missing/broken`);
- assert(skins.blue.length>=2&&skins.blue.every(Boolean),`[${name}] blue mob skin missing/broken`);
- assert(skins.pal.length>=1&&skins.pal.every(Boolean),`[${name}] paladin skin missing/broken`);
+ assert(skins.red.length>=2&&skins.red.every(x=>x.w>0),`[${name}] red mob skin missing/broken: ${JSON.stringify(skins.red)}`);
+ assert(skins.blue.length>=2&&skins.blue.every(x=>x.w>0),`[${name}] blue mob skin missing/broken: ${JSON.stringify(skins.blue)}`);
+ assert(skins.pal.length>=1&&skins.pal.every(x=>x.w>0),`[${name}] paladin skin missing/broken: ${JSON.stringify(skins.pal)}`);
 
  // 5) Real panel command must invoke a special troop, not only direct test hooks.
  const before=(await page.evaluate(()=>window.OneGameTest.snapshot())).units.filter(u=>u.kind==='paladin').length;
