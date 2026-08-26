@@ -8,13 +8,18 @@ s=p.read_text(encoding='utf-8')
 s=s.replace("const BLUE_FRAMES=Array.from({length:8},(_,i)=>`./assets/mobs/regular/blue/frame_${String(i+1).padStart(3,'0')}%202.png`);","const BLUE_FRAMES=Array.from({length:8},(_,i)=>`./assets/mobs/regular/blue/frame_${String(i+1).padStart(3,'0')}.png`);")
 s=s.replace("%202.png`);const PALADIN_BLUE_FRAMES",".png`);const PALADIN_BLUE_FRAMES",1)
 
-# Real sprite taxonomy: 4 directions x 8 frames.
+# VISUALLY AUDITED sprite taxonomy from the real 32 PNG files:
+# 001-008 = front/down (s)
+# 009-016 = back/up (n)
+# 017-024 = left (w)
+# 025-032 = right (e)
 old_maps=[
 "const PALADIN_DIRS={s:[0,1,2,3],se:[4,5,6,7],e:[8,9,10,11],ne:[12,13,14,15],n:[16,17,18,19],nw:[20,21,22,23],w:[24,25,26,27],sw:[28,29,30,31]};",
 "const PALADIN_DIRS={s:[0,1,2,3],e:[4,5,6,7],n:[8,9,10,11],w:[12,13,14,15],se:[16,17,18,19],ne:[20,21,22,23],nw:[24,25,26,27],sw:[28,29,30,31]};",
-"const PALADIN_DIRS={w:[0,1,2,3,4,5,6,7],n:[8,9,10,11,12,13,14,15],s:[16,17,18,19,20,21,22,23],e:[24,25,26,27,28,29,30,31],nw:[0,1,2,3,4,5,6,7],sw:[0,1,2,3,4,5,6,7],ne:[24,25,26,27,28,29,30,31],se:[24,25,26,27,28,29,30,31]};"
+"const PALADIN_DIRS={w:[0,1,2,3,4,5,6,7],n:[8,9,10,11,12,13,14,15],s:[16,17,18,19,20,21,22,23],e:[24,25,26,27,28,29,30,31],nw:[0,1,2,3,4,5,6,7],sw:[0,1,2,3,4,5,6,7],ne:[24,25,26,27,28,29,30,31],se:[24,25,26,27,28,29,30,31]};",
+"const PALADIN_DIRS={w:[0,1,2,3,4,5,6,7],n:[8,9,10,11,12,13,14,15],s:[16,17,18,19,20,21,22,23],e:[24,25,26,27,28,29,30,31]};"
 ]
-new_map="const PALADIN_DIRS={w:[0,1,2,3,4,5,6,7],n:[8,9,10,11,12,13,14,15],s:[16,17,18,19,20,21,22,23],e:[24,25,26,27,28,29,30,31]};"
+new_map="const PALADIN_DIRS={s:[0,1,2,3,4,5,6,7],n:[8,9,10,11,12,13,14,15],w:[16,17,18,19,20,21,22,23],e:[24,25,26,27,28,29,30,31]};"
 for old in old_maps:
     if old in s:
         s=s.replace(old,new_map,1)
@@ -57,7 +62,6 @@ function rotateFacing(u,desired,dt=.016){
 
 start=s.find("function rotateFacing(u,desired,dt=.016){")
 if start!=-1:
-    # Include a pre-existing cardinalFacing immediately before rotateFacing if present.
     cstart=s.rfind("function cardinalFacing(",0,start)
     block_start=cstart if cstart!=-1 and start-cstart<600 else start
     end=s.find("\nfunction paladinDirection",start)
@@ -80,28 +84,44 @@ if pal_start!=-1:
 s=s.replace("const dirName=u.dir8||u.faceDir||'w',group=PALADIN_DIRS[dirName]||PALADIN_DIRS.w;","const dirName=cardinalFacing(u.dir8||u.faceDir||u.palDir||'w','w'),group=PALADIN_DIRS[dirName]||PALADIN_DIRS.w;",1)
 s=s.replace("const dirName=cardinalFacing(u.dir8||u.faceDir||'w','w'),group=PALADIN_DIRS[dirName]||PALADIN_DIRS.w;","const dirName=cardinalFacing(u.dir8||u.faceDir||u.palDir||'w','w'),group=PALADIN_DIRS[dirName]||PALADIN_DIRS.w;",1)
 
-# Public QA snapshot must expose exactly the stored cardinal states, never stale diagonals.
-old="units:alive.map(u=>({team:u.team,kind:u.kind||'mob',x:u.x,y:u.y,hp:u.hp,formationLane:u.formationLane,formationRow:u.formationRow,dir8:u.dir8??null,targetIsCastle:!!u.targetIsCastle,attackingCastle:!!u.attackingCastle}))"
-new="units:alive.map(u=>({team:u.team,kind:u.kind||'mob',x:u.x,y:u.y,hp:u.hp,formationLane:u.formationLane,formationRow:u.formationRow,dir8:cardinalFacing(u.dir8,u.team==='red'?'e':'w'),faceDir:cardinalFacing(u.faceDir,u.team==='red'?'e':'w'),palDir:u.kind==='paladin'?cardinalFacing(u.palDir||u.faceDir,'w'):null,targetIsCastle:!!u.targetIsCastle,attackingCastle:!!u.attackingCastle}))"
-if old in s:s=s.replace(old,new,1)
+# Public QA snapshot exposes logical state PLUS the exact PNG currently rendered.
+old_snapshots=[
+"units:alive.map(u=>({team:u.team,kind:u.kind||'mob',x:u.x,y:u.y,hp:u.hp,formationLane:u.formationLane,formationRow:u.formationRow,dir8:u.dir8??null,targetIsCastle:!!u.targetIsCastle,attackingCastle:!!u.attackingCastle}))",
+"units:alive.map(u=>({team:u.team,kind:u.kind||'mob',x:u.x,y:u.y,hp:u.hp,formationLane:u.formationLane,formationRow:u.formationRow,dir8:cardinalFacing(u.dir8,u.team==='red'?'e':'w'),faceDir:cardinalFacing(u.faceDir,u.team==='red'?'e':'w'),palDir:u.kind==='paladin'?cardinalFacing(u.palDir||u.faceDir,'w'):null,targetIsCastle:!!u.targetIsCastle,attackingCastle:!!u.attackingCastle}))"
+]
+new_snapshot="units:alive.map(u=>({team:u.team,kind:u.kind||'mob',spawnIndex:u.spawnIndex,x:u.x,y:u.y,hp:u.hp,formationLane:u.formationLane,formationRow:u.formationRow,dir8:cardinalFacing(u.dir8,u.team==='red'?'e':'w'),faceDir:cardinalFacing(u.faceDir,u.team==='red'?'e':'w'),palDir:u.kind==='paladin'?cardinalFacing(u.palDir||u.faceDir,'w'):null,png:u.img?.dataset?.src||u.img?.getAttribute?.('src')||null,animFrame:u.frame??0,targetIsCastle:!!u.targetIsCastle,attackingCastle:!!u.attackingCastle}))"
+for old in old_snapshots:
+    if old in s:
+        s=s.replace(old,new_snapshot,1)
+        break
 
-# Expose normalization only for deterministic QA of all direction cases.
-s=s.replace("reset(){reset();return true},","normalizeDir(d,fallback='w'){return cardinalFacing(d,fallback)},\n  reset(){reset();return true},",1)
+# Expose deterministic QA probes. They only exercise facing + sprite selection; no gameplay constants change.
+probe=r'''normalizeDir(d,fallback='w'){return cardinalFacing(d,fallback)},
+  paladinRenderProbe(dx,dy){
+    let u=units.find(v=>v.kind==='paladin'&&v.hp>0);
+    if(!u){spawnBluePaladin();u=units.find(v=>v.kind==='paladin'&&v.hp>0)}
+    const d=cardinalFacing(wantedDir(Number(dx)||0,Number(dy)||0,u.faceDir||'w'),u.faceDir||'w');
+    setFacingState(u,d,'w');u.frame=0;u.anim=0;animateUnit(u,.22,true,1);
+    const png=u.img?.dataset?.src||u.img?.getAttribute?.('src')||null;
+    const m=png&&png.match(/frame_(\d+)\.png$/);
+    return{dx:Number(dx)||0,dy:Number(dy)||0,dir:u.dir8,faceDir:u.faceDir,palDir:u.palDir,frameIndex:m?Number(m[1]):null,png};
+  },'''
+if "paladinRenderProbe(dx,dy)" not in s:
+    s=s.replace("normalizeDir(d,fallback='w'){return cardinalFacing(d,fallback)},",probe,1)
 
 # Preserve castle approach and all other gameplay as-is.
-# Only normalize state after separation/collision in case any future helper touched direction.
 s=s.replace("applyFreeSeparation(u);resolveCastleBodies(u);animateUnit(u,dt,moving,rawTx);","applyFreeSeparation(u);resolveCastleBodies(u);if(u.kind==='paladin')setFacingState(u,u.dir8||u.faceDir||u.palDir||'w','w');animateUnit(u,dt,moving,rawTx);",1)
 
 # Organized panel preview paths only.
 s=s.replace("https://wallissonghost-code.github.io/1game/assets/mobs/red/frame_001.png","https://wallissonghost-code.github.io/1game/assets/mobs/regular/red/frame_001.png")
 s=s.replace("https://wallissonghost-code.github.io/1game/assets/mobs/blue/frame_001%202.png","https://wallissonghost-code.github.io/1game/assets/mobs/regular/blue/frame_001.png")
 
-marker='/* paladin-cardinal-state-v3 */'
+marker='/* paladin-visual-map-v4 */'
 if marker not in s:
-    for old_marker in ['/* paladin-cardinal-facing-v2 */','/* paladin-4dir-8frames-v1 */','/* facing-combat-v2 */']:
+    for old_marker in ['/* paladin-cardinal-state-v3 */','/* paladin-cardinal-facing-v2 */','/* paladin-4dir-8frames-v1 */','/* facing-combat-v2 */']:
         if old_marker in s:
             s=s.replace(old_marker,marker+old_marker,1)
             break
 
 p.write_text(s,encoding='utf-8')
-print('patched game.html: single cardinal state for dir8/faceDir/palDir; no diagonal state leakage')
+print('patched game.html: visually audited PALADIN_DIRS s=001-008 n=009-016 w=017-024 e=025-032')
