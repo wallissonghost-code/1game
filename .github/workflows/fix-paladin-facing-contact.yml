@@ -22,5 +22,6 @@ jobs:
           git config user.name 'github-actions[bot]'
           git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
           git add game.html
-          git commit -m 'fix: paladino marcha correto e encosta no castelo' || exit 0
+          git commit -m 'fix: marcha reta, facing correto e contato de castelo' || exit 0
           git push origin HEAD:dev
+# trigger v2
