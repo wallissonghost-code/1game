@@ -1,0 +1,29 @@
+name: Promote tested dev to main
+on:
+  push:
+    branches: [dev]
+permissions:
+  contents: write
+jobs:
+  gate-and-promote:
+    runs-on: ubuntu-latest
+    timeout-minutes: 18
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '24'
+      - name: Install QA dependencies
+        run: |
+          npm install --no-audit --no-fund
+          npx playwright install --with-deps chromium
+      - name: Critical release gate
+        run: npm run check:release
+      - name: Gameplay QA
+        run: npm run check:gameplay
+      - name: Promote exact tested commit to main
+        run: |
+          git fetch origin main
+          git push origin HEAD:main
