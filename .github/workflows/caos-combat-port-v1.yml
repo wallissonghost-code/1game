@@ -1,0 +1,185 @@
+name: Caos combat port v1
+on:
+  push:
+    paths:
+      - '.github/workflows/caos-combat-port-v1.yml'
+permissions:
+  contents: write
+jobs:
+  refactor:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Reorganize assets and port combat behavior
+        run: |
+          python3 - <<'PY'
+          from pathlib import Path
+          import re, json, shutil
+
+          # ---------- Asset taxonomy ----------
+          moves = [
+            ('assets/castles/Vermelho.png','assets/players/castles/red/castle.png'),
+            ('assets/castles/Azul.png','assets/players/castles/blue/castle.png'),
+          ]
+          for src,dst in moves:
+            s,d=Path(src),Path(dst)
+            if s.exists():
+              d.parent.mkdir(parents=True,exist_ok=True)
+              shutil.move(str(s),str(d))
+
+          for color in ('red','blue'):
+            src=Path(f'assets/mobs/{color}')
+            dst=Path(f'assets/mobs/regular/{color}')
+            dst.mkdir(parents=True,exist_ok=True)
+            if src.exists():
+              for f in list(src.iterdir()):
+                if f.is_file(): shutil.move(str(f),str(dst/f.name))
+
+          src=Path('assets/mobs/boss/blue')
+          dst=Path('assets/mobs/special/paladin/blue')
+          dst.mkdir(parents=True,exist_ok=True)
+          if src.exists():
+            for f in list(src.iterdir()):
+              if f.is_file(): shutil.move(str(f),str(dst/f.name))
+
+          # Real bosses do not exist yet; README keeps empty taxonomy visible in Git.
+          for color in ('red','blue'):
+            p=Path(f'assets/bosses/{color}/README.md');p.parent.mkdir(parents=True,exist_ok=True)
+            if not p.exists(): p.write_text('# Bosses '+color+'\n\nReservado para bosses reais. Paladinos não pertencem a esta classe.\n',encoding='utf-8')
+          Path('assets/players/README.md').write_text('# Players\n\nNo 1Game, os Players são os castelos/objetivos de cada reino.\n',encoding='utf-8')
+          Path('assets/mobs/special/README.md').write_text('# Tropas especiais\n\nUnidades acima do mob comum, mas abaixo de Boss. Ex.: Paladino.\n',encoding='utf-8')
+
+          # ---------- Config ----------
+          cfg=Path('config/assets.json')
+          if cfg.exists():
+            data=json.loads(cfg.read_text(encoding='utf-8'))
+            data['version']=4
+            data['castles']['chaos-red-v1']['src']='assets/players/castles/red/castle.png'
+            data['castles']['light-blue-v1']['src']='assets/players/castles/blue/castle.png'
+            data.setdefault('mobs',{})['warrior-chaos-default']['class']='regular'
+            data['mobs']['warrior-chaos-default']['src']='assets/mobs/regular/red/'
+            data['mobs']['warrior-light-default']['class']='regular'
+            data['mobs']['warrior-light-default']['src']='assets/mobs/regular/blue/'
+            data['mobs']['paladin-light-v1']={'type':'paladin','class':'special','team':'blue','src':'assets/mobs/special/paladin/blue/','frames':32}
+            data['bosses']={'red':{},'blue':{}}
+            cfg.write_text(json.dumps(data,ensure_ascii=False,indent=2)+'\n',encoding='utf-8')
+
+          # ---------- Gameplay ----------
+          p=Path('game.html');s=p.read_text(encoding='utf-8')
+          marker='/* caos-combat-port-v1 */'
+          if marker in s: raise SystemExit('already patched')
+
+          # New paths and taxonomy.
+          s=s.replace('./assets/mobs/red/','./assets/mobs/regular/red/')
+          s=s.replace('./assets/mobs/blue/','./assets/mobs/regular/blue/')
+          s=s.replace('./assets/mobs/boss/blue/','./assets/mobs/special/paladin/blue/')
+          s=s.replace('./assets/castles/Vermelho.png','./assets/players/castles/red/castle.png')
+          s=s.replace('./assets/castles/Azul.png','./assets/players/castles/blue/castle.png')
+
+          # Correct 32-frame directional mapping, matching Caos Live's direct32 convention.
+          s,n=re.subn(r"const PALADIN_DIRS=\{[^;]+\};",
+            "const PALADIN_DIRS={s:[0,8,16,24],se:[1,9,17,25],e:[2,10,18,26],ne:[3,11,19,27],n:[4,12,20,28],nw:[5,13,21,29],w:[6,14,22,30],sw:[7,15,23,31]};"+marker,
+            s,count=1)
+          if n!=1: raise SystemExit('PALADIN_DIRS anchor not found')
+
+          # Castle attack point sits OUTSIDE the visible castle body.
+          s,n=re.subn(r"function castlePoint\(team\)\{return team==='red'\?\{x:58,y:battle\.clientHeight\*\.48\}:\{x:battle\.clientWidth-58,y:battle\.clientHeight\*\.48\}\}",
+            "function castlePoint(team){return team==='red'?{x:118,y:battle.clientHeight*.48}:{x:battle.clientWidth-118,y:battle.clientHeight*.48}}",s,count=1)
+          if n!=1: raise SystemExit('castlePoint anchor not found')
+
+          # Organic spawn distribution: no lanes/columns, no spawn inside the castle.
+          s,n=re.subn(r"function spawnPoint\(team\)\{.*?return\{x,y,formationY:y,formationLane:lane,formationRow:row\}\}",
+            "function spawnPoint(team){const i=spawnSeq[team]++,h=battle.clientHeight,center=h*.48,span=Math.min(230,h*.34),seed=(Math.imul(i+1,1103515245)+(team==='red'?12345:54321))>>>0,j=((seed%10000)/9999)*2-1,y=clamp(center+j*span,48,h-52),depth=((seed>>>12)%5)*8,x=team==='red'?136+depth:battle.clientWidth-136-depth;return{x,y,spawnIndex:i}}",s,count=1)
+          if n!=1: raise SystemExit('spawnPoint anchor not found')
+
+          s=s.replace("units.push({el,img,team,x:p.x,y:p.y,formationY:p.formationY,formationLane:p.formationLane,formationRow:p.formationRow,hp:UNIT_HP",
+                      "units.push({el,img,team,kind:'warrior',unitClass:'regular',collisionRadius:12,spawnIndex:p.spawnIndex,x:p.x,y:p.y,hp:UNIT_HP",1)
+          s=s.replace("kind:'paladin',frames:PALADIN_BLUE_FRAMES,palDir:'w',palDirCandidate:'w',palDirTicks:0,x:p.x,y:p.y,formationY:p.formationY,formationLane:p.formationLane,formationRow:p.formationRow,hp:35",
+                      "kind:'paladin',unitClass:'special',collisionRadius:17,frames:PALADIN_BLUE_FRAMES,palDir:'w',palDirCandidate:'w',palDirTicks:0,spawnIndex:p.spawnIndex,x:p.x,y:p.y,hp:35",1)
+
+          # Physical body for Players/castles. Units may attack the edge, never cover the castle art.
+          helper="""
+          function unitRadius(u){return u?.collisionRadius||(u?.kind==='paladin'?17:12)}
+          function resolveCastleBodies(u){
+            const r=unitRadius(u),cy=battle.clientHeight*.48,halfH=82+r;
+            if(Math.abs(u.y-cy)>halfH)return;
+            const left=100+r,right=battle.clientWidth-100-r;
+            if(u.x<left)u.x=left;
+            if(u.x>right)u.x=right;
+          }
+          """
+          anchor='function enemyNear(u){'
+          if anchor not in s: raise SystemExit('enemyNear anchor not found')
+          s=s.replace(anchor,helper+anchor,1)
+
+          # Zero-distance fallback no longer depends on formation lanes/rows.
+          s=s.replace("const seed=((u.formationLane||0)*17+(u.formationRow||0)*31+(u.kind==='paladin'?11:3));",
+                      "const seed=((u.spawnIndex||0)*37+(u.kind==='paladin'?11:3));")
+
+          # Separate physical bodies regardless of team; enemies then stop at attack range.
+          s=s.replace("if(v===u||v.hp<=0||v.dead||v.team!==u.team)continue;",
+                      "if(v===u||v.hp<=0||v.dead)continue;")
+          s=s.replace("const vr=v.kind==='paladin'?17:12,min=ur+vr;",
+                      "const vr=unitRadius(v),min=ur+vr+(v.team===u.team?2:0);")
+
+          # Replace the old formation/steering combat block with Caos-style stop radius + stable attack state.
+          pat=r"const isCastle=!!u\.targetIsCastle,rawTx=target\.x,rawTy=target\.y,farFromCastle=.*?applyFreeSeparation\(u\);u\.animDx=rawTx-u\.x;u\.animDy=rawTy-u\.y;animateUnit\(u,dt,moving,tx\);"
+          new="""const isCastle=!!u.targetIsCastle,rawTx=target.x,rawTy=target.y,dx=rawTx-u.x,dy=rawTy-u.y,d=Math.hypot(dx,dy)||.001,ur=unitRadius(u),tr=isCastle?0:unitRadius(target),stopRadius=isCastle?CASTLE_RANGE:(ur+tr+5);let moving=false;if(d<=stopRadius){u.attackingCastle=isCastle;if(!u.fighting){u.fighting=true;u.el.classList.add('fight')}u.animDx=dx;u.animDy=dy;if(u.atk<=0){u.atk=ATTACK_CD;if(isCastle)hitCastle(u.team==='red'?'blue':'red',CASTLE_DAMAGE*(u.castleDamageMul||1));else{target.hp-=UNIT_DAMAGE*(u.damageMul||1);if(target.hp<=0)kill(target)}}}else{moving=true;u.attackingCastle=false;if(u.fighting){u.fighting=false;u.el.classList.remove('fight')}let vx=dx/d,vy=dy/d;u.x+=vx*UNIT_SPEED*(u.speedMul||1)*dt;u.y+=vy*UNIT_SPEED*(u.speedMul||1)*dt;u.animDx=vx;u.animDy=vy}applyFreeSeparation(u);resolveCastleBodies(u);animateUnit(u,dt,moving,rawTx);"""
+          s,n=re.subn(pat,new,s,count=1,flags=re.S)
+          if n!=1: raise SystemExit('combat loop anchor not found')
+
+          # Paladin: animate only while moving; when attacking, hold a stable directional frame.
+          old="if(u.kind==='paladin'){const dx=Number.isFinite(u.animDx)?u.animDx:(targetX-u.x),dy=Number.isFinite(u.animDy)?u.animDy:0,dirName=paladinDirection(u,dx,dy),group=PALADIN_DIRS[dirName]||PALADIN_DIRS.w;img.style.transform='scaleX(1)';u.anim+=dt;const interval=moving?.075:.12;if(u.anim>=interval){u.anim=0;u.frame=((u.frame||0)+1)%group.length;const src=PALADIN_BLUE_FRAMES[group[u.frame]];if(img.dataset.src!==src){img.dataset.src=src;img.src=src}}return}"
+          new="if(u.kind==='paladin'){const dx=Number.isFinite(u.animDx)?u.animDx:(targetX-u.x),dy=Number.isFinite(u.animDy)?u.animDy:0,dirName=paladinDirection(u,dx,dy),group=PALADIN_DIRS[dirName]||PALADIN_DIRS.w;u.dir8=dirName;img.style.transform='scaleX(1)';if(!moving){u.anim=0;u.frame=0;const src=PALADIN_BLUE_FRAMES[group[0]];if(img.dataset.src!==src){img.dataset.src=src;img.src=src}return}u.anim+=dt;const interval=.085;if(u.anim>=interval){u.anim=0;u.frame=((u.frame||0)+1)%group.length;const src=PALADIN_BLUE_FRAMES[group[u.frame]];if(img.dataset.src!==src){img.dataset.src=src;img.src=src}}return}"
+          if old not in s: raise SystemExit('paladin animate anchor not found')
+          s=s.replace(old,new,1)
+
+          # Regular knights also stop cycling walk frames while attacking.
+          s=s.replace("if(u.anim>=interval){u.anim=0;if(moving||perfMode===0){u.frame=(u.frame+1)%frames.length;",
+                      "if(u.anim>=interval){u.anim=0;if(moving){u.frame=(u.frame+1)%frames.length;",1)
+
+          # Manifest preview path follows new special-unit location.
+          s=s.replace('assets/mobs/boss/blue/frame_001.png','assets/mobs/special/paladin/blue/frame_001.png')
+          s=s.replace("version:'0.4'","version:'0.5'",1)
+
+          # Explicit model notes for future units.
+          note="<!-- 1Game taxonomy v1: Player=castle | Mob regular=knight | Mob special=paladin | Boss=reserved -->"
+          s=s.replace('<body>',note+'<body>',1)
+          p.write_text(s,encoding='utf-8')
+          PY
+
+      - name: Extend gameplay QA
+        run: |
+          python3 - <<'PY'
+          from pathlib import Path
+          p=Path('scripts/gameplay-qa.mjs')
+          if not p.exists(): raise SystemExit('gameplay QA missing')
+          s=p.read_text(encoding='utf-8')
+          if 'CASTLE BODY OVERLAP' not in s:
+            anchor="assert(palMin>=30,`[${name}] PALADIN OVERLAP: minimum center distance ${palMin.toFixed(1)}px (expected >=30px)`);"
+            extra=anchor+"\n  const bw=viewport.width;\n  assert(pals.every(u=>u.x>=112&&u.x<=bw-112),`[${name}] CASTLE BODY OVERLAP: special unit entered player/castle body`);"
+            if anchor in s:s=s.replace(anchor,extra,1)
+          p.write_text(s,encoding='utf-8')
+          PY
+
+      - name: Validate taxonomy and mechanics
+        run: |
+          set -e
+          test -f assets/players/castles/red/castle.png
+          test -f assets/players/castles/blue/castle.png
+          test -f assets/mobs/special/paladin/blue/frame_001.png
+          test -d assets/mobs/regular/red
+          test -d assets/mobs/regular/blue
+          grep -q 'caos-combat-port-v1' game.html
+          grep -q 'resolveCastleBodies' game.html
+          grep -q 'unitClass.*special' game.html
+          grep -q 's:\[0,8,16,24\]' game.html
+          grep -q 'assets/mobs/special/paladin/blue' game.html
+
+      - name: Commit refactor
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add -A
+          git diff --cached --quiet || git commit -m "refactor: combate estilo Caos Live + taxonomia correta"
+          git push
