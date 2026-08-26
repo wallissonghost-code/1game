@@ -5,8 +5,10 @@ on:
     paths:
       - '.github/workflows/fix-paladin-facing-contact.yml'
       - 'scripts/fix-paladin-facing-contact.py'
+      - 'scripts/final-round-castle-contact.py'
       - 'scripts/stamp-version.py'
       - 'scripts/gameplay-qa.mjs'
+      - 'scripts/final-round-castle-qa.mjs'
   workflow_dispatch:
 permissions:
   contents: write
@@ -23,7 +25,9 @@ jobs:
         with:
           node-version: '24'
       - name: Apply focused gameplay fix
-        run: python3 scripts/fix-paladin-facing-contact.py
+        run: |
+          python3 scripts/fix-paladin-facing-contact.py
+          python3 scripts/final-round-castle-contact.py
       - name: Stamp approved build version
         env:
           GAME_BUILD_PATCH: ${{ github.run_number }}
@@ -36,13 +40,15 @@ jobs:
         run: npm run check:release
       - name: Gameplay QA on patched tree
         run: npm run check:gameplay
+      - name: Final round and castle contact QA
+        run: node scripts/final-round-castle-qa.mjs
       - name: Commit exact tested build to dev
         run: |
           git config user.name 'github-actions[bot]'
           git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
           git add game.html
           if ! git diff --cached --quiet; then
-            git commit -m "fix: paladino cardinal + BETA 0.2.${{ github.run_number }} validados"
+            git commit -m "fix: rodada limpa + contato do castelo + BETA 0.2.${{ github.run_number }} validados"
             git push origin HEAD:dev
           fi
       - name: Promote exact tested build to main
