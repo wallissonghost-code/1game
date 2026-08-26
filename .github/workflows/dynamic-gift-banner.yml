@@ -10,22 +10,24 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
-      - name: Remove wasted space below HUD
+      - name: Pin footer to viewport bottom
         run: |
           python3 - <<'PY'
           from pathlib import Path
           p=Path('game.html')
           s=p.read_text()
-          css='''\n<style id="hud-auto-height-v1">\n/* Let the footer use only the height its content actually needs. */\n.game{grid-template-rows:auto minmax(0,1fr) auto!important}.livebar{min-height:0!important;height:auto!important;align-self:end!important}.sides,.side,.rules,.team-comment{min-height:0}.side{height:auto!important}.side .rules{flex:none!important}.team-comment{margin-bottom:0!important}.livebar{padding-bottom:max(8px,env(safe-area-inset-bottom))!important}\n@media(orientation:portrait){.game{grid-template-rows:auto minmax(0,1fr) auto!important}}\n@media(orientation:landscape){.game{grid-template-rows:auto minmax(0,1fr) auto!important}}\n</style>\n'''
-          if 'id="hud-auto-height-v1"' not in s:s=s.replace('</head>',css+'</head>',1)
+          css='''\n<style id="hud-bottom-fill-v2">\n/* Fill the viewport exactly: battle grows, footer stays attached to the bottom safe-area. */\nhtml,body{height:100%;min-height:100%;background:#080b12}.game{height:100dvh!important;min-height:100dvh!important;max-height:100dvh!important;grid-template-rows:auto minmax(0,1fr) auto!important;overflow:hidden!important}.battle{min-height:0!important}.livebar{position:relative!important;align-self:stretch!important;margin:0!important;min-height:0!important;height:auto!important;padding-bottom:max(10px,env(safe-area-inset-bottom))!important;background:linear-gradient(180deg,#080e18 0%,#050910 100%)!important}.livebar:after{content:"";display:block;height:0}.sides{margin-bottom:0!important}.side,.team-comment{margin-bottom:0!important}\n@supports not (height:100dvh){.game{height:100vh!important;min-height:100vh!important;max-height:100vh!important}}\n@media(orientation:portrait){.game{grid-template-rows:auto minmax(0,1fr) auto!important}}\n@media(orientation:landscape){.game{grid-template-rows:auto minmax(0,1fr) auto!important}}\n</style>\n'''
+          if 'id="hud-bottom-fill-v2"' not in s:s=s.replace('</head>',css+'</head>',1)
           p.write_text(s)
           PY
       - name: Check
-        run: grep -q 'hud-auto-height-v1' game.html
+        run: |
+          grep -q 'hud-bottom-fill-v2' game.html
+          grep -q '100dvh' game.html
       - name: Commit
         run: |
           git config user.name ghostzinho
           git config user.email wallissonghost@gmail.com
           git add game.html
-          git commit -m "ui: remover espaço vazio abaixo do HUD"
+          git commit -m "ui: grudar HUD inferior no fim da tela"
           git push
