@@ -1,0 +1,30 @@
+name: 1Game Gameplay QA
+on:
+  push:
+    branches: [main]
+    paths:
+      - 'game.html'
+      - 'assets/**'
+      - 'scripts/gameplay-qa.mjs'
+      - 'package.json'
+      - '.github/workflows/gameplay-qa.yml'
+  pull_request:
+    branches: [main]
+  workflow_dispatch:
+permissions:
+  contents: read
+jobs:
+  gameplay-qa:
+    runs-on: ubuntu-latest
+    timeout-minutes: 12
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '24'
+      - name: Install QA dependencies
+        run: |
+          npm install --no-audit --no-fund
+          npx playwright install --with-deps chromium
+      - name: Run automated battle scenarios
+        run: npm run check:gameplay
