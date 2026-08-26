@@ -1,0 +1,26 @@
+name: Fix paladin facing and castle contact
+on:
+  push:
+    branches: [dev]
+    paths:
+      - '.github/workflows/fix-paladin-facing-contact.yml'
+  workflow_dispatch:
+permissions:
+  contents: write
+jobs:
+  patch:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: dev
+      - name: Apply focused gameplay fix
+        run: python3 scripts/fix-paladin-facing-contact.py
+      - name: Commit patched game to dev
+        run: |
+          git config user.name 'github-actions[bot]'
+          git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
+          git add game.html
+          git commit -m 'fix: paladino marcha correto e encosta no castelo' || exit 0
+          git push origin HEAD:dev
