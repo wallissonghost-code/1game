@@ -1,4 +1,4 @@
-name: Fullscreen anchored HUD
+name: Beta label timer
 on:
   push:
     paths:
@@ -10,25 +10,23 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
-      - name: Anchor HUD and expand battlefield
+      - name: Add beta version above timer
         run: |
           python3 - <<'PY'
           from pathlib import Path
           p=Path('game.html')
           s=p.read_text()
-          css='''\n<style id="hud-fixed-bottom-v3">\n:root{--hud-h:0px}html,body{width:100%;height:100%;min-height:100%;overflow:hidden;background:#080b12}.game{position:fixed!important;inset:0!important;display:block!important;height:100dvh!important;min-height:100dvh!important;max-height:100dvh!important;overflow:hidden!important;background:#0b111b}.hud{position:absolute!important;left:0;right:0;top:0;z-index:40}.battle{position:absolute!important;left:0;right:0;top:var(--top-h,0px);bottom:var(--hud-h,0px)!important;min-height:0!important}.livebar{position:absolute!important;left:0;right:0;bottom:0!important;z-index:45;margin:0!important;height:auto!important;min-height:0!important;padding-bottom:max(10px,env(safe-area-inset-bottom))!important}.sides,.side,.rules,.team-comment{min-height:0!important}.side .rules{flex:none!important}\n@supports not (height:100dvh){.game{height:100vh!important;min-height:100vh!important;max-height:100vh!important}}\n</style>\n<script id="hud-fixed-bottom-script">(()=>{const root=document.documentElement,hud=document.querySelector('.hud'),bar=document.querySelector('.livebar');if(!hud||!bar)return;const sync=()=>{root.style.setProperty('--top-h',Math.ceil(hud.getBoundingClientRect().height)+'px');root.style.setProperty('--hud-h',Math.ceil(bar.getBoundingClientRect().height)+'px')};new ResizeObserver(sync).observe(bar);new ResizeObserver(sync).observe(hud);window.addEventListener('resize',sync,{passive:true});window.visualViewport?.addEventListener('resize',sync,{passive:true});requestAnimationFrame(sync)})();</script>\n'''
-          if 'id="hud-fixed-bottom-v3"' not in s:s=s.replace('</body>',css+'</body>',1)
+          css='''\n<style id="beta-version-v020">\n.timerbox{position:relative!important;margin-top:10px!important}\n.timerbox:before{content:"BETA 0.2.0";position:absolute;left:50%;bottom:calc(100% + 3px);transform:translateX(-50%);font-size:5.5px;line-height:1;font-weight:950;letter-spacing:.16em;color:#7f8a9a;white-space:nowrap;text-shadow:0 1px 4px #000}\n</style>\n'''
+          if 'id="beta-version-v020"' not in s:
+              s=s.replace('</head>',css+'</head>',1)
           p.write_text(s)
           PY
       - name: Check
-        run: |
-          grep -q 'hud-fixed-bottom-v3' game.html
-          grep -q -- '--hud-h' game.html
-          grep -q 'ResizeObserver' game.html
+        run: grep -q 'BETA 0.2.0' game.html
       - name: Commit
         run: |
           git config user.name ghostzinho
           git config user.email wallissonghost@gmail.com
           git add game.html
-          git commit -m "ui: gameplay fullscreen com HUD ancorado no rodape"
+          git commit -m "ui: exibir Beta 0.2.0 acima do timer"
           git push
