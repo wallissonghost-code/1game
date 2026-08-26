@@ -1,0 +1,84 @@
+name: Paladin panel action
+on:
+  push:
+    paths:
+      - '.github/workflows/paladin-panel-action.yml'
+permissions:
+  contents: write
+jobs:
+  patch:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Add blue paladin action to game protocol
+        run: |
+          python3 - <<'PY'
+          from pathlib import Path
+          p=Path('game.html')
+          s=p.read_text(encoding='utf-8')
+
+          # 32-frame paladin asset set, loaded by the actual battle engine.
+          old="const RED_FRAMES=Array.from({length:9},(_,i)=>`./assets/mobs/red/frame_${String(i+1).padStart(3,'0')}.png`);const BLUE_FRAMES=Array.from({length:8},(_,i)=>`./assets/mobs/blue/frame_${String(i+1).padStart(3,'0')}%202.png`);[...RED_FRAMES,...BLUE_FRAMES].forEach(src=>{const i=new Image();i.src=src});"
+          new="const RED_FRAMES=Array.from({length:9},(_,i)=>`./assets/mobs/red/frame_${String(i+1).padStart(3,'0')}.png`);const BLUE_FRAMES=Array.from({length:8},(_,i)=>`./assets/mobs/blue/frame_${String(i+1).padStart(3,'0')}%202.png`);const PALADIN_BLUE_FRAMES=Array.from({length:32},(_,i)=>`./assets/mobs/boss/blue/frame_${String(i+1).padStart(3,'0')}.png`);[...RED_FRAMES,...BLUE_FRAMES,...PALADIN_BLUE_FRAMES].forEach(src=>{const i=new Image();i.src=src});"
+          if old not in s: raise SystemExit('frame declaration anchor not found')
+          s=s.replace(old,new,1)
+
+          # Spawn one real special unit using the same AI/pathfinding as other troops.
+          anchor="function update(){const r=units.filter(u=>u.team==='red'&&u.hp>0).length"
+          paladin="""function spawnBluePaladin(){if(ended)return;const team='blue',p=spawnPoint(team),el=document.createElement('div');el.className='unit blue paladin';el.innerHTML=`<img class=\"mob-sprite paladin-sprite\" src=\"${PALADIN_BLUE_FRAMES[0]}\" alt=\"Paladino Azul\">`;battle.appendChild(el);const img=el.firstElementChild;img.dataset.src=PALADIN_BLUE_FRAMES[0];el.style.transform=`translate3d(${p.x}px,${p.y}px,0)`;units.push({el,img,team,kind:'paladin',frames:PALADIN_BLUE_FRAMES,x:p.x,y:p.y,formationY:p.formationY,formationLane:p.formationLane,formationRow:p.formationRow,hp:35,atk:0,counted:false,attackingCastle:false,fighting:false,target:null,targetIsCastle:false,frame:0,anim:0,facing:-1,damageMul:4,castleDamageMul:3,speedMul:.9});update();sendState(true)}"""
+          if anchor not in s: raise SystemExit('update anchor not found')
+          s=s.replace(anchor,paladin+anchor,1)
+
+          # Paladin has its own 32-frame sequence.
+          old="const frames=u.team==='red'?RED_FRAMES:BLUE_FRAMES,dir=targetX<u.x?-1:1,native=u.team==='red'?1:-1;"
+          new="const frames=u.frames||(u.team==='red'?RED_FRAMES:BLUE_FRAMES),dir=targetX<u.x?-1:1,native=u.team==='red'?1:-1;"
+          if old not in s: raise SystemExit('animation frames anchor not found')
+          s=s.replace(old,new,1)
+
+          # Make the special unit meaningfully stronger without changing regular mobs.
+          s=s.replace('target.hp-=UNIT_DAMAGE;if(target.hp<=0)kill(target)', 'target.hp-=UNIT_DAMAGE*(u.damageMul||1);if(target.hp<=0)kill(target)',1)
+          s=s.replace("hitCastle(u.team==='red'?'blue':'red',CASTLE_DAMAGE)", "hitCastle(u.team==='red'?'blue':'red',CASTLE_DAMAGE*(u.castleDamageMul||1))",1)
+          s=s.replace('u.x+=vx/vl*UNIT_SPEED*dt;u.y+=vy/vl*UNIT_SPEED*dt;', 'u.x+=vx/vl*UNIT_SPEED*(u.speedMul||1)*dt;u.y+=vy/vl*UNIT_SPEED*(u.speedMul||1)*dt;',1)
+
+          # Slightly larger boss/special visual.
+          css='<style id="paladin-blue-v1">.unit.paladin{z-index:5}.unit.paladin .paladin-sprite{width:62px;height:72px;left:-21px;top:-33px;filter:drop-shadow(0 5px 7px #000a) drop-shadow(0 0 6px #77aaff55)}.battle.perf-high .unit.paladin .paladin-sprite{filter:none!important}</style>'
+          if 'id="paladin-blue-v1"' not in s:s=s.replace('</head>',css+'</head>',1)
+
+          # Publish the control to Projeto Daniel through the existing game manifest.
+          old="['spawn_blue_40','Azul +40'],['reset','Resetar batalha']"
+          new="['spawn_blue_40','Azul +40'],['spawn_blue_paladin','Azul · Invocar Paladino'],['reset','Resetar batalha']"
+          if old not in s: raise SystemExit('manifest actions anchor not found')
+          s=s.replace(old,new,1)
+
+          # Fix metadata for this action so panel renders a useful preview.
+          old="icon:id==='reset'?'🔄':id==='reset_match'?'🧹':(id.includes('_red_')?'🔴':'🔵'),iconImage:id==='reset'?'':(id.includes('_red_')?'https://wallissonghost-code.github.io/1game/assets/mobs/red/frame_001.png':'https://wallissonghost-code.github.io/1game/assets/mobs/blue/frame_001%202.png'),description:id==='reset'?'Reinicia a batalha':id==='reset_match'?'Zera as estrelas e inicia um novo confronto':(id.includes('_red_')?'Adiciona guerreiros ao time vermelho':'Adiciona guerreiros ao time azul')"
+          new="icon:id==='reset'?'🔄':id==='reset_match'?'🧹':id==='spawn_blue_paladin'?'🛡️':(id.includes('_red_')?'🔴':'🔵'),iconImage:id==='reset'?'':id==='spawn_blue_paladin'?'https://wallissonghost-code.github.io/1game/assets/mobs/boss/blue/frame_001.png':(id.includes('_red_')?'https://wallissonghost-code.github.io/1game/assets/mobs/red/frame_001.png':'https://wallissonghost-code.github.io/1game/assets/mobs/blue/frame_001%202.png'),description:id==='reset'?'Reinicia a batalha':id==='reset_match'?'Zera as estrelas e inicia um novo confronto':id==='spawn_blue_paladin'?'Invoca um Paladino Azul especial com 32 frames':(id.includes('_red_')?'Adiciona guerreiros ao time vermelho':'Adiciona guerreiros ao time azul')"
+          if old not in s: raise SystemExit('manifest metadata anchor not found')
+          s=s.replace(old,new,1)
+
+          # Accept commands from the panel.
+          old="if(m)spawn(m[1],Number(m[2]));else if(d.action==='reset')reset();"
+          new="if(m)spawn(m[1],Number(m[2]));else if(d.action==='spawn_blue_paladin')spawnBluePaladin();else if(d.action==='reset')reset();"
+          if old not in s: raise SystemExit('command anchor not found')
+          s=s.replace(old,new,1)
+
+          # Remove the earlier experimental window.units script if it exists: engine now owns Paladin properly.
+          start=s.find('<script>\n/* blue-paladin-32-test */')
+          if start!=-1:
+              end=s.find('</script>',start)
+              if end!=-1:s=s[:start]+s[end+9:]
+
+          p.write_text(s,encoding='utf-8')
+          PY
+      - name: Validate
+        run: |
+          grep -q "spawn_blue_paladin" game.html
+          grep -q "PALADIN_BLUE_FRAMES" game.html
+          grep -q "function spawnBluePaladin" game.html
+      - name: Commit
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add game.html
+          git diff --cached --quiet || git commit -m "feat: painel pode invocar Paladino Azul"
+          git push
