@@ -1,0 +1,106 @@
+name: Free movement anti-overlap
+on:
+  push:
+    paths:
+      - '.github/workflows/free-movement-separation.yml'
+permissions:
+  contents: write
+jobs:
+  patch:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Apply organic anti-overlap movement
+        run: |
+          python3 - <<'PY'
+          from pathlib import Path
+          import re
+
+          p=Path('game.html')
+          s=p.read_text(encoding='utf-8')
+          marker='/* free-movement-separation-v1 */'
+          if marker in s:
+              raise SystemExit('already patched')
+
+          # Paladino continua especial: mais dano e velocidade perceptivelmente maior,
+          # mas sem virar uma unidade que atravessa a tropa inteira sozinha.
+          s,n=re.subn(r"(kind:'paladin'[^}]{0,700}?speedMul:)\s*[-+]?\d*\.?\d+",r"\g<1>1.18",s,count=1)
+          if n!=1:
+              raise SystemExit('paladin speedMul anchor not found')
+
+          # Spatial hash rebuilt at most once every ~32 ms. This keeps anti-overlap local
+          # instead of comparing every mob against every other mob (important at 300+ mobs).
+          helper=r'''
+          /* free-movement-separation-v1 */
+          let separationGrid=new Map(),separationGridAt=-1;
+          const SEP_CELL=38;
+          function separationKey(x,y){return `${Math.floor(x/SEP_CELL)},${Math.floor(y/SEP_CELL)}`}
+          function ensureSeparationGrid(){
+            const now=performance.now();
+            if(now-separationGridAt<32)return;
+            separationGridAt=now;separationGrid=new Map();
+            for(const q of units){
+              if(!q||q.hp<=0||q.dead)continue;
+              const k=separationKey(q.x,q.y),a=separationGrid.get(k);
+              if(a)a.push(q);else separationGrid.set(k,[q]);
+            }
+          }
+          function applyFreeSeparation(u){
+            if(!u||u.hp<=0||u.dead)return;
+            ensureSeparationGrid();
+            const cx=Math.floor(u.x/SEP_CELL),cy=Math.floor(u.y/SEP_CELL);
+            let sx=0,sy=0,hits=0;
+            const ur=u.kind==='paladin'?17:12;
+            for(let ox=-1;ox<=1;ox++)for(let oy=-1;oy<=1;oy++){
+              const list=separationGrid.get(`${cx+ox},${cy+oy}`);if(!list)continue;
+              for(const v of list){
+                if(v===u||v.hp<=0||v.dead||v.team!==u.team)continue;
+                const vr=v.kind==='paladin'?17:12,min=ur+vr;
+                let dx=u.x-v.x,dy=u.y-v.y,d2=dx*dx+dy*dy;
+                if(d2>=min*min)continue;
+                if(d2<.04){
+                  const seed=((u.formationLane||0)*17+(u.formationRow||0)*31+(u.kind==='paladin'?11:3));
+                  const a=(seed%17)/17*Math.PI*2;dx=Math.cos(a);dy=Math.sin(a);d2=1;
+                }
+                const d=Math.sqrt(d2),push=(min-d)/min;
+                sx+=dx/d*push;sy+=dy/d*push;hits++;
+              }
+            }
+            if(!hits)return;
+            const mag=Math.hypot(sx,sy)||1,maxStep=u.kind==='paladin'?2.2:1.7;
+            // Position correction only. It does NOT choose a lane, target or formation.
+            // Therefore units remain free to overtake, spread and chase normally.
+            const step=Math.min(maxStep,.75+hits*.22);
+            u.x+=sx/mag*step;u.y+=sy/mag*step;
+          }
+          '''
+
+          # Insert helper immediately before animation helper (stable anchor from current engine).
+          anchor='function paladinDirection(u,dx,dy){'
+          if anchor not in s:
+              anchor='function animateUnit(u,dt,moving,targetX){'
+          if anchor not in s:
+              raise SystemExit('movement helper anchor not found')
+          s=s.replace(anchor,helper+anchor,1)
+
+          # Apply separation after movement logic and before rendering/animation.
+          render_anchor='u.animDx=rawTx-u.x;u.animDy=rawTy-u.y;animateUnit(u,dt,moving,tx);'
+          if render_anchor not in s:
+              raise SystemExit('render/animate anchor not found')
+          s=s.replace(render_anchor,'applyFreeSeparation(u);'+render_anchor,1)
+
+          p.write_text(s,encoding='utf-8')
+          PY
+      - name: Validate patch
+        run: |
+          grep -q "free-movement-separation-v1" game.html
+          grep -q "function applyFreeSeparation" game.html
+          grep -q "speedMul:1.18" game.html
+          node --check scripts/gameplay-qa.js || true
+      - name: Commit
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add game.html
+          git diff --cached --quiet || git commit -m "fix: movimento livre sem overlap; Paladino especial 1.18x"
+          git push
