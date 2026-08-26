@@ -1,0 +1,63 @@
+name: Test blue paladin 32 frames
+on:
+  push:
+    paths:
+      - '.github/workflows/test-blue-paladin-32.yml'
+permissions:
+  contents: write
+jobs:
+  patch:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Apply 32-frame blue paladin test
+        run: |
+          python3 - <<'PY'
+          from pathlib import Path
+          p=Path('game.html')
+          s=p.read_text(encoding='utf-8')
+          marker='/* blue-paladin-32-test */'
+          if marker not in s:
+              inject=r'''<script>
+/* blue-paladin-32-test */
+(()=>{
+  const PALADIN_BLUE_FRAMES=Array.from({length:32},(_,i)=>`./assets/mobs/boss/blue/frame_${String(i+1).padStart(3,'0')}.png`);
+  PALADIN_BLUE_FRAMES.forEach(src=>{const im=new Image();im.src=src});
+  window.PALADIN_BLUE_FRAMES=PALADIN_BLUE_FRAMES;
+  function promoteBlue(u){
+    if(!u||u.team!=='blue'||u._paladin32)return;
+    const img=u.el&&u.el.querySelector('.mob-sprite');
+    if(!img)return;
+    u._paladin32=true;u.frame=0;u.anim=0;
+    img.src=PALADIN_BLUE_FRAMES[0];
+    u.el.classList.add('paladin-blue');
+  }
+  const originalRAF=window.requestAnimationFrame;
+  let last=performance.now();
+  function tick(now){
+    const dt=Math.min(.05,(now-last)/1000);last=now;
+    if(window.units&&Array.isArray(window.units)){
+      for(const u of window.units){
+        if(u.team!=='blue')continue;
+        promoteBlue(u);
+        if(!u._paladin32||u.dead)continue;
+        const img=u.el&&u.el.querySelector('.mob-sprite');if(!img)continue;
+        u._palAnim=(u._palAnim||0)+dt;
+        if(u._palAnim>=.055){u._palAnim=0;u._palFrame=((u._palFrame||0)+1)%32;img.src=PALADIN_BLUE_FRAMES[u._palFrame]}
+      }
+    }
+    originalRAF(tick);
+  }
+  originalRAF(tick);
+})();
+</script>'''
+              s=s.replace('</body>',inject+'</body>',1)
+          p.write_text(s,encoding='utf-8')
+          PY
+      - name: Commit
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add game.html
+          git diff --cached --quiet || git commit -m "feat: ativar teste Paladino Azul 32 frames"
+          git push
