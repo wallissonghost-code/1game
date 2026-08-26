@@ -1,11 +1,13 @@
 name: 1Game Gameplay QA
 on:
   push:
-    branches: [main]
+    branches: [main, dev]
     paths:
+      - 'index.html'
       - 'game.html'
       - 'assets/**'
-      - 'scripts/gameplay-qa.mjs'
+      - 'config/**'
+      - 'scripts/**'
       - 'package.json'
       - '.github/workflows/gameplay-qa.yml'
   pull_request:
@@ -16,7 +18,7 @@ permissions:
 jobs:
   gameplay-qa:
     runs-on: ubuntu-latest
-    timeout-minutes: 12
+    timeout-minutes: 15
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-node@v4
@@ -26,5 +28,7 @@ jobs:
         run: |
           npm install --no-audit --no-fund
           npx playwright install --with-deps chromium
+      - name: Run critical release gate
+        run: npm run check:release
       - name: Run automated battle scenarios
         run: npm run check:gameplay
