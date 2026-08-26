@@ -5,6 +5,7 @@ on:
     paths:
       - '.github/workflows/fix-paladin-facing-contact.yml'
       - 'scripts/fix-paladin-facing-contact.py'
+      - 'scripts/stamp-version.py'
   workflow_dispatch:
 permissions:
   contents: write
@@ -22,6 +23,10 @@ jobs:
           node-version: '24'
       - name: Apply focused gameplay fix
         run: python3 scripts/fix-paladin-facing-contact.py
+      - name: Stamp approved build version
+        env:
+          GAME_BUILD_PATCH: ${{ github.run_number }}
+        run: python3 scripts/stamp-version.py
       - name: Install QA dependencies
         run: |
           npm install --no-audit --no-fund
@@ -36,7 +41,7 @@ jobs:
           git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
           git add game.html
           if ! git diff --cached --quiet; then
-            git commit -m 'fix: paladino 4 direções x 8 frames validado'
+            git commit -m "fix: paladino cardinal + BETA 0.2.${{ github.run_number }} validados"
             git push origin HEAD:dev
           fi
       - name: Promote exact tested tree to main
