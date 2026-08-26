@@ -40,8 +40,8 @@ async function runScenario(browser,name,viewport){
 
   // Direction stability: moving toward one objective must not spin through directions every frame.
   const history=[];for(let i=0;i<18;i++){const s=await snap();history.push(s.units.find(u=>u.kind==='paladin')?.dir8);await sleep(110)}
-  const clean=history.filter(Number.isFinite),changes=clean.slice(1).reduce((n,v,i)=>n+(v!==clean[i]?1:0),0);
-  assert(changes<=5,`[${name}] PALADIN DIRECTION FLICKER: ${changes} direction changes in ~2s (${clean.join(',')})`);
+  const clean=history.filter(Boolean),changes=clean.slice(1).reduce((n,v,i)=>n+(v!==clean[i]?1:0),0);
+  assert(changes<=2,`[${name}] PALADIN DIRECTION FLICKER: ${changes} direction changes in ~2s (${clean.join(',')})`);
 
   // Mixed armies: both sides must stay alive, finite and inside a sane world envelope.
   await call('reset');await call('spawn','red',40);await call('spawn','blue',40);for(let i=0;i<4;i++)await call('paladin');await sleep(2500);
