@@ -1,0 +1,28 @@
+name: Apply facing combat v2
+on:
+  push:
+    branches: [dev]
+    paths:
+      - 'scripts/apply-facing-v2.py'
+      - '.github/workflows/apply-facing-v2.yml'
+permissions:
+  contents: write
+jobs:
+  apply:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Apply patch
+        run: python3 scripts/apply-facing-v2.py
+      - name: Validate anchors
+        run: |
+          grep -q 'facing-combat-v2' game.html
+          grep -q 'rotateFacing' game.html
+          grep -q 'facingReady=rotateFacing' game.html
+      - name: Commit patched game
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add game.html
+          git diff --cached --quiet || git commit -m "feat: rotação suave e ataque orientado v2"
+          git push origin HEAD:dev
