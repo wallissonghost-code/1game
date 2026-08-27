@@ -1,0 +1,46 @@
+name: Fix victory immediate cleanup
+on:
+  push:
+    branches: [dev]
+    paths:
+      - '.github/workflows/fix-victory-immediate-cleanup.yml'
+      - 'scripts/fix-victory-immediate-cleanup.py'
+      - 'scripts/victory-cleanup-qa.mjs'
+  workflow_dispatch:
+permissions:
+  contents: write
+jobs:
+  patch-test-promote:
+    runs-on: ubuntu-latest
+    timeout-minutes: 18
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: dev
+          fetch-depth: 0
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '24'
+      - name: Apply only victory cleanup fix
+        run: python3 scripts/fix-victory-immediate-cleanup.py
+      - name: Install QA dependencies
+        run: |
+          npm install --no-audit --no-fund
+          npx playwright install --with-deps chromium
+      - name: Critical release gate
+        run: npm run check:release
+      - name: Existing gameplay regression gate
+        run: npm run check:gameplay
+      - name: Victory first-frame cleanup QA
+        run: node scripts/victory-cleanup-qa.mjs
+      - name: Commit exact tested game to dev
+        run: |
+          git config user.name 'github-actions[bot]'
+          git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
+          git add game.html
+          if ! git diff --cached --quiet; then
+            git commit -m 'fix: limpar unidades antes do overlay de vitória'
+            git push origin HEAD:dev
+          fi
+      - name: Promote exact tested build to main
+        run: git push origin HEAD:main
