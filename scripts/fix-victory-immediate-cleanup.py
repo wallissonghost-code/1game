@@ -29,10 +29,10 @@ if old_loop in s:
 elif new_loop not in s:
     raise SystemExit('loop guard not found')
 
-# QA-only diagnostics. They do not alter normal gameplay rules.
+# QA-only diagnostics/helpers. They do not alter normal gameplay rules.
 needle = "finishTime(){finishByTime();return true},\n  pause(value=true){paused=!!value;return paused}"
 if needle in s:
-    repl = "finishTime(){finishByTime();return true},\n  victoryDiagnostics(){const overlay=$('victoryOverlay'),card=overlay?.querySelector('.victory-card'),els=[...battle.querySelectorAll('.unit')];return{ended,unitCount:els.length,hiddenCount:els.filter(el=>getComputedStyle(el).display==='none'||getComputedStyle(el).visibility==='hidden').length,overlayShown:!!overlay?.classList.contains('show'),overlayZ:Number(getComputedStyle(overlay).zIndex||0),cardRect:card?card.getBoundingClientRect().toJSON():null}},\n  pause(value=true){paused=!!value;return paused}"
+    repl = "finishTime(){finishByTime();return true},\n  placePaladinsNearCastle(){const pals=units.filter(u=>u.kind==='paladin');const cy=battle.clientHeight*.48;pals.forEach((u,i)=>{u.x=112+(i%4)*18;u.y=cy+(Math.floor(i/4)-2)*28;u.el.style.transform=`translate3d(${u.x}px,${u.y}px,0)`});return pals.length},\n  victoryDiagnostics(){const overlay=$('victoryOverlay'),card=overlay?.querySelector('.victory-card'),els=[...battle.querySelectorAll('.unit')];return{ended,unitCount:els.length,hiddenCount:els.filter(el=>getComputedStyle(el).display==='none'||getComputedStyle(el).visibility==='hidden').length,activeAnimations:els.reduce((n,el)=>n+el.getAnimations({subtree:true}).filter(a=>a.playState==='running').length,0),overlayShown:!!overlay?.classList.contains('show'),overlayZ:Number(getComputedStyle(overlay).zIndex||0),cardRect:card?card.getBoundingClientRect().toJSON():null}},\n  pause(value=true){paused=!!value;return paused}"
     s = s.replace(needle, repl, 1)
 
 p.write_text(s, encoding='utf-8')
