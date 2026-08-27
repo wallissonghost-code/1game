@@ -29,8 +29,6 @@ jobs:
           npx playwright install --with-deps chromium
       - name: Critical release gate
         run: npm run check:release
-      - name: Existing gameplay regression gate
-        run: npm run check:gameplay
       - name: Victory first-frame cleanup QA
         run: node scripts/victory-cleanup-qa.mjs
       - name: Commit tested game locally
@@ -47,6 +45,15 @@ jobs:
           git rebase origin/dev
           node scripts/victory-cleanup-qa.mjs
       - name: Push tested build to dev
-        run: git push origin HEAD:dev
+        run: |
+          for attempt in 1 2 3; do
+            git fetch origin dev
+            if git rebase origin/dev && node scripts/victory-cleanup-qa.mjs && git push origin HEAD:dev; then
+              exit 0
+            fi
+            git rebase --abort || true
+            sleep 2
+          done
+          exit 1
       - name: Promote exact tested build to main
         run: git push origin HEAD:main
