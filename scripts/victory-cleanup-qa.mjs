@@ -56,15 +56,17 @@ async function scenario(browser,count){
   assert(ended.activeAnimations===0,'unit animation remained after ended=true');
   assert(ended.overlayZ>=100,`overlay z-index too low: ${ended.overlayZ}`);
 
-  const hpBefore=(await page.evaluate(()=>window.OneGameTest.snapshot().redHp));
+  const hpBefore=await page.evaluate(()=>window.OneGameTest.snapshot().redHp);
   await call('damageCastle','red',20);
-  const hpAfter=(await page.evaluate(()=>window.OneGameTest.snapshot().redHp));
+  const hpAfter=await page.evaluate(()=>window.OneGameTest.snapshot().redHp);
   assert(hpAfter===hpBefore,'castle kept receiving attacks/damage after ended=true');
 
   await sleep(5400);
   const restarted=await page.evaluate(()=>window.OneGameTest.snapshot());
   assert(restarted.ended===false&&restarted.redHp===100&&restarted.blueHp===100,'next round did not reset normally');
-  assert(document===document,'noop');
+  await call('paladin');
+  const afterSpawn=await page.evaluate(()=>window.OneGameTest.snapshot());
+  assert(afterSpawn.units.some(u=>u.kind==='paladin'),'next round did not accept new units after reset');
   assert(errors.length===0,`runtime errors: ${errors.join(' | ')}`);
   console.log(`VICTORY CLEANUP OK count=${count} firstFrameUnits=${firstFrame.unitCount} overlap=${firstFrame.overlap} animations=${firstFrame.runningAnimations}`);
   await context.close();
