@@ -1,0 +1,12 @@
+(()=>{'use strict';
+const SDK=window.LivePlusGameSDK;if(!SDK?.Session)return;
+const NativePeer=window.Peer;
+class MiniEmitter{constructor(){this._ev=new Map()}on(t,fn){const a=this._ev.get(t)||[];a.push(fn);this._ev.set(t,a);return this}emit(t,...args){for(const fn of this._ev.get(t)||[])try{fn(...args)}catch(e){console.error('[1Game LIVE+]',e)}}}
+function codeFrom(value=''){const m=String(value).match(/(?:liveplus-session-|1game-client-)([a-z0-9]{8})/i);return (m?.[1]||String(value)).toUpperCase().replace(/[^A-Z0-9]/g,'').slice(0,8)}
+class ConnCompat extends MiniEmitter{constructor(code){super();this.code=code;this.open=false;this.session=null;this.started=false;queueMicrotask(()=>{this.open=true;this.emit('open')})}start(){if(this.started)return;this.started=true;const Session=SDK.Session;this.session=new Session({storageKey:'1game-session-token'});this.session.addEventListener('command',e=>this.emit('data',e.detail));this.session.addEventListener('message',e=>this.emit('data',e.detail));this.session.addEventListener('rejected',e=>this.emit('data',{type:'session_reject',reason:e.detail?.reason||'Sessão recusada'}));this.session.addEventListener('transport',e=>{if(e.detail?.status==='disconnected'){this.open=false;this.emit('close')}});this.session.connect(this.code).then(data=>{this.open=true;this.emit('data',{type:'session_accept',token:data?.token||'',exclusive:true,transport:data?.transport||this.session.getTransport?.()||'server'})}).catch(err=>this.emit('error',err))}send(data){if(!data||typeof data!=='object')return false;if(data.type==='session_hello'){this.start();return true}if(!this.session)return false;if(data.type==='game_manifest'&&data.manifest){this.session.setManifest(data.manifest);return this.session.send(data)}return this.session.send(data)}close(){this.open=false;try{this.session?.disconnect()}catch{}this.emit('close')}}
+class PeerCompat extends MiniEmitter{constructor(id){super();this.id=id;this.destroyed=false;queueMicrotask(()=>{if(!this.destroyed)this.emit('open',id||'liveplus-sdk')})}connect(target){const code=codeFrom(target||this.id);const conn=new ConnCompat(code);return conn}destroy(){this.destroyed=true}reconnect(){if(!this.destroyed)this.emit('open',this.id||'liveplus-sdk')}}
+window.OneGameNativePeer=NativePeer;window.Peer=PeerCompat;
+function installPaste(){SDK.installPasteBridge?.('panelCode')}
+installPaste();window.addEventListener('pageshow',installPaste);
+window.OneGameLivePlusCompat={version:'1.0.0',sdkVersion:SDK.version,nativePeer:NativePeer};
+})();
