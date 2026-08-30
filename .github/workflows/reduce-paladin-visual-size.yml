@@ -1,0 +1,38 @@
+name: Reduce paladin visual size
+on:
+  push:
+    branches: [dev]
+    paths:
+      - '.github/workflows/reduce-paladin-visual-size.yml'
+      - 'scripts/reduce-paladin-visual-size.py'
+  workflow_dispatch:
+permissions:
+  contents: write
+jobs:
+  patch-and-promote:
+    runs-on: ubuntu-latest
+    timeout-minutes: 8
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: dev
+          fetch-depth: 0
+      - name: Apply paladin visual scale adjustment
+        run: python3 scripts/reduce-paladin-visual-size.py
+      - name: Validate scope
+        run: |
+          grep -q '.unit.paladin .paladin-sprite{width:50px;height:58px;left:-15px;top:-22px;' game.html
+          grep -q 'collisionRadius:17' game.html
+          grep -q 'damageMul:4,castleDamageMul:3,speedMul:1.18' game.html
+      - name: Commit tested visual adjustment
+        run: |
+          git config user.name 'github-actions[bot]'
+          git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
+          git add game.html
+          if ! git diff --cached --quiet; then
+            git commit -m 'fix: reduzir escala visual do paladino'
+          fi
+      - name: Push dev
+        run: git push origin HEAD:dev
+      - name: Promote to main
+        run: git push origin HEAD:main
